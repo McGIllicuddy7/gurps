@@ -158,7 +158,7 @@ public:
         m_ptr = ptr;
         m_len = len;
     }
-    arr(const vector<T>& v) {
+    arr(vector<T>& v) {
         if (v.size()) {
             m_ptr = &v[0];
             m_len = v.size();
@@ -299,3 +299,4 @@ public:
 
 
 #define todo(...) printf("TODO file:%s line:%d " __VA_OPT__("%s") "\n", __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__); raise(5);
+#define as(T,expr) std::static_cast<T>(expr)

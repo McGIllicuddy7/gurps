@@ -111,11 +111,100 @@ bool GUI::text_input(string& output, int32_t x, int32_t y, int32_t width, int32_
 }
 
 void GUI::text_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t text_height, Color color, const string& id) {
-    todo("make working text scroll box");
+    if (!m_scroll_box_scroll_amounts.contains(id)) {
+        m_scroll_box_scroll_amounts[id] = 0;
+    }
+    int32_t& scroll_amount = m_scroll_box_scroll_amounts[id];
+    x += m_current_panel.x;
+    y += m_current_panel.y;
+    bool hovered = CheckCollisionPointRec(GetMousePosition(), Rectangle{ float(x), float(y), float(width), float(height) });
+    int32_t total_height = (int32_t)text.size() * (text_height + 4);
+
+    if (hovered) {
+        scroll_amount += GetMouseWheelMoveV().y;
+    }
+    if (scroll_amount < 0) {
+        scroll_amount = 0;
+    }
+    else if (scroll_amount > total_height) {
+        scroll_amount = total_height;
+    }
+    draw_rectangle(x, y, width, height, background_color(color));
+    draw_rectangle_lines(x, y, width, height, border_color(color));
+    begin_scissor(x, y, width, height);
+    Rectangle base;
+    base.x = x;
+    base.y = y;
+    base.width = width;
+    base.height = height;
+    for (size_t i = 0;i < text.size(); i++) {
+        Rectangle rt;
+        rt.x = x + 5;
+        rt.y = y + i * (text_height + 2) - scroll_amount;
+        rt.height = text_height;
+        rt.width = (width - 5);
+        if (CheckCollisionRecs(base, rt)) {
+            draw_text(text[i], x + 5, y + i * (text_height + 2) - scroll_amount, text_height, color);
+        }
+    }
+    end_scissor();
 }
 
 int32_t GUI::text_button_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t text_height, Color color, const string& id) {
-    todo("make working text button scroll box");
+    if (!m_scroll_box_scroll_amounts.contains(id)) {
+        m_scroll_box_scroll_amounts[id] = 0;
+    }
+    int32_t& scroll_amount = m_scroll_box_scroll_amounts[id];
+    x += m_current_panel.x;
+    y += m_current_panel.y;
+    bool hovered = CheckCollisionPointRec(GetMousePosition(), Rectangle{ float(x), float(y), float(width), float(height) });
+    int32_t total_height = (int32_t)text.size() * (text_height + 4);
+    if (hovered) {
+        scroll_amount += GetMouseWheelMoveV().y;
+    }
+    if (scroll_amount < 0) {
+        scroll_amount = 0;
+    }
+    else if (scroll_amount > total_height) {
+        scroll_amount = total_height;
+    }
+    draw_rectangle(x, y, width, height, background_color(color));
+    draw_rectangle_lines(x, y, width, height, border_color(color));
+    begin_scissor(x, y, width, height);
+    Rectangle base;
+    base.x = x;
+    base.y = y;
+    base.width = width;
+    base.height = height;
+    int32_t out = -1;
+    for (size_t i = 0;i < text.size(); i++) {
+        Rectangle rt;
+        rt.x = x + 20;
+        rt.y = y + i * (text_height + 2) - scroll_amount;
+        rt.height = text_height;
+        rt.width = (width - 20);
+        if (CheckCollisionRecs(base, rt)) {
+            bool hovered = CheckCollisionPointRec(GetMousePosition(), rt);
+            Color dc = color;
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && hovered) {
+                dc = selected_color(color);
+            }
+            else if (hovered) {
+                dc = hovered_color(color);
+            }
+            else {
+                dc = color;
+            }
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && hovered) {
+                out = i;
+            }
+            draw_rectangle(x, y + i * (text_height + 2) - scroll_amount, width, text_height + 4, background_color(dc));
+            draw_rectangle_lines(x, y + i * (text_height + 2) - scroll_amount, width, text_height + 4, border_color(dc));
+            draw_text(text[i], x + 5, y + i * (text_height + 2) + 2 - scroll_amount, text_height, feature_color(dc));
+        }
+    }
+    end_scissor();
+    return out;
 }
 
 void GUI::image(string_view image, int32_t x, int32_t y, int32_t width, int32_t height, Color color) {
