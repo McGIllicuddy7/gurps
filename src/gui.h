@@ -83,14 +83,10 @@ class GUI {
     Panel m_current_panel;
 public:
     bool text_button(string_view text, int32_t x, int32_t y, int32_t width, int32_t height, Color color);
-
     void text(string_view text, int32_t x, int32_t y, int32_t width, int32_t height, Color color);
     bool text_input(string& output, int32_t x, int32_t y, int32_t width, int32_t height, Color color, const string& id);
-
     void text_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t text_height, Color color, const string& id);
-
     int32_t text_button_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t text_height, Color color, const string& id);
-
     void image(string_view image, int32_t x, int32_t y, int32_t width, int32_t height, Color color);
 
     void reset();
@@ -107,5 +103,14 @@ public:
     void draw_texture(Texture2D texture, int32_t x, int32_t y, int32_t width, int32_t height, Color color);
     void begin_scissor(int32_t x, int32_t y, int32_t width, int32_t height);
     void end_scissor();
+    bool text_button(string_view text, int32_t text_height, Color color);
+    void text(string_view text, int32_t text_height, Color color);
+    int32_t multiline_text(string_view text, int32_t text_height, Color color);
+    bool text_input(string& output, int32_t text_height, Color color, const string& id);
+    void text_scroll_box(arr<string_view> text, int32_t height, int32_t text_height, Color color, const string& id);
+    int32_t text_button_scroll_box(arr<string_view> text, int32_t height, int32_t text_height, Color color, const string& id);
+    void image(string_view image, int32_t height, Color color);
 };
+extern vector<string> split_sv_lines(string_view text, int32_t text_height, int32_t width);
 
+extern const string LOREM_IPSUM;

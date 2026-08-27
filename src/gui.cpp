@@ -118,8 +118,13 @@ void GUI::text_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t w
     x += m_current_panel.x;
     y += m_current_panel.y;
     bool hovered = CheckCollisionPointRec(GetMousePosition(), Rectangle{ float(x), float(y), float(width), float(height) });
-    int32_t total_height = (int32_t)text.size() * (text_height + 4);
-
+    int32_t total_height = 0;
+    vector<vector<string>> list;
+    for (string_view& i : text) {
+        vector<string> tmp = split_sv_lines(i, text_height, width - 5);
+        total_height += (tmp.size() + 4) * text_height;
+        list.push_back(tmp);
+    }
     if (hovered) {
         scroll_amount += GetMouseWheelMoveV().y;
     }
@@ -137,17 +142,22 @@ void GUI::text_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t w
     base.y = y;
     base.width = width;
     base.height = height;
-    for (size_t i = 0;i < text.size(); i++) {
-        Rectangle rt;
-        rt.x = x + 5;
-        rt.y = y + i * (text_height + 2) - scroll_amount;
-        rt.height = text_height;
-        rt.width = (width - 5);
-        if (CheckCollisionRecs(base, rt)) {
-            draw_text(text[i], x + 5, y + i * (text_height + 2) - scroll_amount, text_height, color);
+    size_t i = 0;
+    for (const vector<string>& j : list) {
+        for (const string& k : j) {
+            Rectangle rt;
+            rt.x = x + 5;
+            rt.y = y + i * (text_height + 2) - scroll_amount;
+            rt.height = text_height;
+            rt.width = (width - 5);
+            if (CheckCollisionRecs(base, rt)) {
+                draw_text(k, x + 5, y + i * (text_height + 2) - scroll_amount, text_height, color);
+            }
+            i += 1;
         }
     }
     end_scissor();
+    m_current_panel.offset += height + 2;
 }
 
 int32_t GUI::text_button_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t width, int32_t height, int32_t text_height, Color color, const string& id) {
@@ -204,6 +214,7 @@ int32_t GUI::text_button_scroll_box(arr<string_view> text, int32_t x, int32_t y,
         }
     }
     end_scissor();
+    m_current_panel.offset += height + 2;
     return out;
 }
 
@@ -214,6 +225,7 @@ void GUI::image(string_view image, int32_t x, int32_t y, int32_t width, int32_t 
         m_textures[nm] = texture;
     }
     m_draw_calls.push_back(DrawCall{ .kind = DRAW_CALL_DRAW_IMAGE,.text = nm,.x = x, .y = y, .width = width, .height = height,.color = color, .text_height = 0 });
+    m_current_panel.offset += height + 2;
 }
 
 void GUI::reset() {
@@ -432,3 +444,58 @@ void GUI::end_scissor() {
     DrawCall dc = DrawCall::end_scissor();
     m_draw_calls.push_back(dc);
 }
+bool GUI::text_button(string_view text, int32_t text_height, Color color) {
+    return text_button(text, m_current_panel.x + 10, m_current_panel.offset + m_current_panel.y, m_current_panel.width - 20, (text_height * 5) / 4, color);
+}
+void GUI::text(string_view text, int32_t text_height, Color color) {
+    this->text(text, m_current_panel.x + 10, m_current_panel.offset + m_current_panel.y, m_current_panel.width - 20, (text_height * 5) / 4, color);
+}
+bool GUI::text_input(string& output, int32_t text_height, Color color, const string& id) {
+    return text_input(output, m_current_panel.x + 10, m_current_panel.y + m_current_panel.offset, m_current_panel.width - 20, (text_height * 5) / 4, color, id);
+}
+void GUI::text_scroll_box(arr<string_view> text, int32_t height, int32_t text_height, Color color, const string& id) {
+    text_scroll_box(text, m_current_panel.x + 10, m_current_panel.y + m_current_panel.offset, m_current_panel.width - 20, height, text_height, color, id);
+}
+
+int32_t GUI::text_button_scroll_box(arr<string_view> text, int32_t height, int32_t text_height, Color color, const string& id) {
+    return text_button_scroll_box(text, m_current_panel.x + 10, m_current_panel.y + m_current_panel.offset, m_current_panel.width - 20, height, text_height, color, id);
+}
+void GUI::image(string_view image, int32_t height, Color color) {
+    return this->image(image, m_current_panel.x + 10, m_current_panel.y + m_current_panel.offset, m_current_panel.width - 20, height, color);
+}
+
+int32_t GUI::multiline_text(string_view text, int32_t text_height, Color color) {
+    vector<string> list = split_sv_lines(text, text_height, m_current_panel.width - 10);
+    for (const string& i : list) {
+        this->text(i, text_height, color);
+    }
+    return text_height * list.size();
+}
+vector<string> split_sv_lines(string_view text, int32_t text_height, int32_t width) {
+    vector<string> out;
+    string current = "";
+    for (const char i : text) {
+        if (i == '\n') {
+            out.push_back(current);
+            current.clear();
+        }
+        else {
+            current.push_back(i);
+            int32_t w = MeasureText(current.c_str(), text_height);
+            if (w > width) {
+                current.pop_back();
+                if (!current.empty()) {
+                    out.push_back(current);
+                }
+                current.clear();
+                current.push_back(i);
+            }
+        }
+    }
+    if (!current.empty()) {
+        out.push_back(current);
+    }
+    return out;
+}
+
+const string LOREM_IPSUM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus lacinia efficitur lorem, a convallis tellus luctus sit amet. Phasellus nec luctus ipsum. Donec pulvinar quis nisi ut luctus. Nunc accumsan pharetra tristique. Donec quis odio augue. Suspendisse ac nisi sit amet nulla consequat placerat. Sed tincidunt lacinia nibh eu eleifend. Cras sit amet blandit nisi. Vivamus ullamcorper consectetur risus eu consectetur. Ut ut justo leo. Nulla mollis leo eu sem fermentum, non vestibulum urna congue.\n\nFusce mattis neque in arcu elementum, sit amet volutpat lectus tincidunt.Morbi non lacinia sem.In id massa lectus.Curabitur gravida urna non egestas lobortis.Quisque suscipit, mauris ut venenatis porttitor, diam dolor ornare augue, ac scelerisque nisi orci sed sem.Aenean egestas venenatis finibus.Cras non efficitur sapien.Mauris sagittis justo ante, eget sodales tortor molestie sed.Nulla eros dolor, ullamcorper nec consectetur non, bibendum vel lorem.Aenean luctus massa dui, vel semper odio tempus ut.\n\nPhasellus sit amet leo a nunc consectetur egestas.Morbi tellus purus, placerat vitae facilisis id, tincidunt ut ex.Integer sit amet imperdiet mi.Duis et egestas mi.Donec non elit vel augue finibus pharetra.Mauris et eros pulvinar, aliquam dolor eget, tristique mi.Maecenas vel diam in odio pulvinar fermentum.\n\nDonec massa mi, consectetur in dui ut, iaculis commodo elit.Duis varius rutrum odio eget dignissim.Maecenas ligula sapien, accumsan id fringilla sed, volutpat nec lacus.Morbi porttitor tellus faucibus rhoncus tincidunt.Vestibulum et tempus eros.Proin rutrum elit neque, vitae ullamcorper nunc dignissim eget.Proin vulputate mattis erat et dapibus.\n\nDonec dictum nisl ut convallis condimentum.Fusce sagittis quam feugiat dolor feugiat feugiat.Aenean vehicula commodo sem, id congue sapien.Nulla sed tellus fringilla, elementum erat at, posuere mi.Integer ut elit lectus.Nulla tincidunt accumsan scelerisque.Maecenas semper pellentesque nisi, a eleifend dui gravida quis.Ut hendrerit malesuada diam, non feugiat lectus placerat sed.Nam ac euismod nisi.Sed scelerisque ipsum sit amet ligula rhoncus, vel pharetra dolor malesuada.Nulla eleifend risus non velit egestas, ac mollis dui rutrum.";
