@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "utils.h"
+#include <raylib.h>
 struct Bounds {
     int32_t x;
     int32_t y;
@@ -27,11 +28,16 @@ enum WeaponKind {
 struct Entity {
 public:
     EntityKind kind;
-    string name;
+    str name;
     float2 position;
     float2 velocity;
+    float2 facing;
+    float width;
+    float height;
     int32_t health;
-    int32_t ammo[WEAPON_KIND_COUNT];
+    int32_t ammo[WEAPON_KIND_COUNT][2];
+    void on_tick(float delta_time);
+    void on_tick_paused(float delta_time);
 };
 
 struct Line {
@@ -43,6 +49,26 @@ struct World {
     vector<Line> walls;
 };
 struct Game {
+    bool is_running;
+    bool should_exit;
+    bool is_paused;
     World world;
-
+    PtrSet<Entity> entities;
+    vector<Entity* > destroy_queue;
 };
+
+extern Game game;
+
+extern constexpr Vector2 to_rl(float2 p);
+extern constexpr float2 to_game(Vector2 p);
+Game* get_game();
+World* get_world();
+vector<Entity*> get_entities();
+void game_update();
+void game_load_world(string_view path);
+void game_teardown();
+void menu_teardown();
+void gameloop();
+void menu_update();
+void game_render();
+void menu_render();
