@@ -73,11 +73,11 @@ struct float2 {
         return acos(this->dot(rhs) / (this->len() * rhs.len()));
     }
     inline constexpr float angle() const noexcept {
-        return this->angle_to({ 1., 0. });
+        return atan2(this->y, this->x);
     }
     inline constexpr float2 rotated_by(float theta) {
         float len = this->len();
-        float angle = this->angle();
+        float angle = this->angle() + theta;
         float x = cos(angle) * len;
         float y = sin(angle) * len;
         return { x,y };
@@ -276,6 +276,9 @@ public:
                 to_run(*m_values[i]);
             }
         }
+    }
+    void clear() {
+        m_values.clear();
     }
 };
 

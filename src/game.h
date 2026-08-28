@@ -5,6 +5,7 @@
 #include <raylib.h>
 #include <assert.h>
 #define WORLD_TILE_DIM 128
+#define WORLD_TILE_SIZE 32
 struct Bounds {
     int32_t x;
     int32_t y;
@@ -17,32 +18,22 @@ enum EntityKind {
     ENTITY_KIND_PLAYER,
     ENTITY_KIND_ENEMY,
 };
-enum WeaponKind {
-    WEAPON_KIND_NONE,
-    WEAPON_KIND_KNIFE,
-    WEAPON_KIND_CONVENTIONAL_PISTOL,
-    WEAPON_KIND_CONVENTIONAL_RIFLE,
-    WEAPON_KIND_CONVENTIONAL_SHOTGUN,
-    WEAPON_KIND_GUASS_PISTOL,
-    WeAPON_KIND_GUASS_RIFLE,
-    WEAPON_KIND_GUASS_SMG,
-    WEAPON_KIND_COUNT
-};
+
 struct Entity {
 public:
-    EntityKind kind;
-    str name;
-    float2 position;
-    float2 velocity;
-    float2 facing;
-    float width;
-    float height;
-    int32_t health;
-    int32_t ammo[WEAPON_KIND_COUNT][2];
-    bool is_player;
+    EntityKind kind = ENTITY_KIND_NONE;
+    string name = "";
+    float2 position = { 0., 0. };
+    float2 velocity = { 0., 0. };
+    float2 facing = { 1., 0. };
+    float width = 1.;
+    float height = 1.;
+    int32_t health = 1;
+    bool is_player = false;;
     void on_tick(float delta_time);
     void on_tick_paused(float delta_time);
     void on_render();
+    Bounds get_bounds()const;
 };
 
 
@@ -66,6 +57,12 @@ struct World {
         return (*tiles).size();
     }
 };
+struct RaycastResult {
+    bool hit = false;
+    float2 pos = { 0.0, 0.0 };
+    float2 normal = { 0., 0. };
+    Entity* hit_entity = nullptr;
+};
 struct Game {
     bool is_running;
     bool should_exit;
@@ -74,6 +71,8 @@ struct Game {
     PtrSet<Entity> entities;
     vector<Entity* > destroy_queue;
     GUI gui;
+    bool check_collision_rect(Bounds b);
+    RaycastResult raycast(float2 start, float2 end);
 };
 
 extern Game game;
@@ -93,3 +92,7 @@ void menu_update();
 void game_render();
 void menu_render();
 World game_generate_world();
+Entity* new_entity(Entity et);
+void game_setup(Entity* previous_player);
+
+

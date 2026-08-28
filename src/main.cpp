@@ -4,5 +4,6 @@
 #include "gui.h"
 
 int main() {
+    srand(time(0));
     gameloop();
 }
