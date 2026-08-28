@@ -120,6 +120,7 @@ void GUI::text_scroll_box(arr<string_view> text, int32_t x, int32_t y, int32_t w
     bool hovered = CheckCollisionPointRec(GetMousePosition(), Rectangle{ float(x), float(y), float(width), float(height) });
     int32_t total_height = 0;
     vector<vector<string>> list;
+    list.reserve(text.size());
     for (string_view& i : text) {
         vector<string> tmp = split_sv_lines(i, text_height, width - 5);
         total_height += (tmp.size() + 4) * text_height;

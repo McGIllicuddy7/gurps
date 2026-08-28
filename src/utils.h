@@ -299,4 +299,4 @@ public:
 
 
 #define todo(...) printf("TODO file:%s line:%d " __VA_OPT__("%s") "\n", __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__); raise(5);
-#define as(T,expr) std::static_cast<T>(expr)
+
