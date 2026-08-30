@@ -38,7 +38,7 @@ void game_teardown() {
 
 void gameloop() {
     InitWindow(1000, 800, "gurps");
-    //  SetTargetFPS(61);
+    SetTargetFPS(61);
     SetExitKey(0);
     while (!WindowShouldClose()) {
         get_game()->should_exit = false;
@@ -86,13 +86,13 @@ void game_render() {
     Vector2 player_pos = { 500., 400. };
     Vector2 player_facing = Vector2{ 1., 0. };
     get_game()->entities.for_each([&](GEntity& i) {
-        if (i.is_player) {
-            player_x = round(i.position.x / WORLD_TILE_SIZE);
-            player_y = round(i.position.y / WORLD_TILE_SIZE);
-            x_off = i.position.x - player_x * WORLD_TILE_SIZE;
-            y_off = i.position.y - player_y * WORLD_TILE_SIZE;
-            player_pos = Vector2{ .x = -i.position.x + 500.f, .y = -i.position.y + 400.f };
-            player_facing = Vector2{ .x = i.facing.x, .y = i.facing.y };
+        if (i.m_is_player) {
+            player_x = round(i.m_position.x / WORLD_TILE_SIZE);
+            player_y = round(i.m_position.y / WORLD_TILE_SIZE);
+            x_off = i.m_position.x - player_x * WORLD_TILE_SIZE;
+            y_off = i.m_position.y - player_y * WORLD_TILE_SIZE;
+            player_pos = Vector2{ .x = -i.m_position.x + 500.f, .y = -i.m_position.y + 400.f };
+            player_facing = Vector2{ .x = i.m_facing.x, .y = i.m_facing.y };
         }
         });
     Camera2D cam = { 0 };
@@ -172,6 +172,10 @@ void game_tick() {
             i.on_tick(delta_time);
             });
         particle_updates(delta_time);
+        for (auto& i : get_game()->destroy_queue) {
+            get_game()->entities.destroy(i);
+        }
+        get_game()->destroy_queue.clear();
     }
     else {
         get_game()->entities.for_each([=](GEntity& i) {
@@ -189,15 +193,23 @@ void game_setup(GEntity* previous_player) {
     }
     else {
         GEntity player = { };
-        player.kind = GENTITY_KIND_PLAYER;
-        player.is_player = true;
-        player.position = { 0., 0. };
-        player.facing = { 1., 0. };
-        player.health = 10;
-        player.height = 16;
-        player.width = 16;
+        player.m_kind = GENTITY_KIND_PLAYER;
+        player.m_is_player = true;
+        player.m_position = { 0., 0. };
+        player.m_facing = { 1., 0. };
+        player.m_health = 10;
+        player.m_height = 16;
+        player.m_width = 16;
         new_entity(player);
     }
+    GEntity enemy = { };
+    enemy.m_kind = GENTITY_KIND_ENEMY;
+    enemy.m_position = { WORLD_TILE_SIZE * 4., WORLD_TILE_SIZE * 4. };
+    enemy.m_facing = { 1., 0. };
+    enemy.m_health = 10;
+    enemy.m_height = 16;
+    enemy.m_width = 16;
+    new_entity(enemy);
 }
 
 bool GGame::check_collision_rect(GBounds b) {
@@ -375,11 +387,11 @@ GRaycastResult GGame::raycast(g_float2 start, g_float2 end, const vector<GEntity
 
 void particle_updates(float delta_time) {
     for (GParticle& i : game.particles) {
-        if (i.exists) {
-            i.pos += i.velocity * delta_time;
-            i.remaining_lifetime -= delta_time;
-            if (i.remaining_lifetime < 0.) {
-                i.exists = false;
+        if (i.m_exists) {
+            i.m_pos += i.m_velocity * delta_time;
+            i.m_remaining_lifetime -= delta_time;
+            if (i.m_remaining_lifetime < 0.) {
+                i.m_exists = false;
             }
         }
     }
@@ -388,16 +400,16 @@ void particle_updates(float delta_time) {
 void particle_rendering(float delta_time) {
     (void)delta_time;
     for (const GParticle& i : game.particles) {
-        if (i.exists) {
-            switch (i.kind) {
+        if (i.m_exists) {
+            switch (i.m_kind) {
             case GPARTICLE_LINE: {
-                DrawLine(i.pos.x, i.pos.y, i.pos2.x, i.pos2.y, i.color);
+                DrawLine(i.m_pos.x, i.m_pos.y, i.m_pos2.x, i.m_pos2.y, i.m_color);
             }
             case GPARTICLE_PARTICLE: {
-                DrawCircle(i.pos.x, i.pos.y, i.radius, i.color);
+                DrawCircle(i.m_pos.x, i.m_pos.y, i.m_radius, i.m_color);
             }
             case GPARTICLE_SQUARE: {
-                DrawRectanglePro(Rectangle{ i.pos.x - i.pos.x / 2, i.pos.y - i.height / 2 }, { 0., 0.0 }, i.rotation, i.color);
+                DrawRectanglePro(Rectangle{ i.m_pos.x - i.m_pos.x / 2, i.m_pos.y - i.m_height / 2 }, { 0., 0.0 }, i.m_rotation, i.m_color);
             }
             }
         }
@@ -406,10 +418,21 @@ void particle_rendering(float delta_time) {
 
 void spawn_particle(GParticle particle) {
     for (GParticle& i : game.particles) {
-        if (!i.exists) {
+        if (!i.m_exists) {
             i = particle;
             return;
         }
     }
     game.particles.push_back(particle);
+}
+
+void delete_entity(GEntity* et) {
+    get_game()->destroy_queue.push_back(et);
+}
+int32_t roll(size_t dice_count) {
+    int32_t out = 0;
+    for (size_t i = 0; i < dice_count; i++) {
+        out += rand() % 6 + 1;
+    }
+    return out;
 }

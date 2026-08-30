@@ -13,17 +13,17 @@ enum GParticleKind {
 };
 
 struct GParticle {
-    g_float2 pos = { 0.0, 0.0 };
-    g_float2 pos2 = { 0.0, 0.0 };
-    float width = 0.;
-    float height = 0.;
-    float radius = 0.;
-    float rotation = 0.;
-    g_float2 velocity = { 0.0, 0.0 };
-    GParticleKind kind = GPARTICLE_PARTICLE;
-    Color color = RED;
-    float remaining_lifetime = 0.;
-    bool exists = false;
+    g_float2 m_pos = { 0.0, 0.0 };
+    g_float2 m_pos2 = { 0.0, 0.0 };
+    float m_width = 0.;
+    float m_height = 0.;
+    float m_radius = 0.;
+    float m_rotation = 0.;
+    g_float2 m_velocity = { 0.0, 0.0 };
+    GParticleKind m_kind = GPARTICLE_PARTICLE;
+    Color m_color = RED;
+    float m_remaining_lifetime = 0.;
+    bool m_exists = false;
 };
 
 struct GBounds {
@@ -39,24 +39,39 @@ enum GEntityKind {
     GENTITY_KIND_ENEMY,
 };
 
+enum GDamageType {
+    G_DAMAGE_TYPE_CRUSHING,
+    G_DAMAGE_TYPE_CUTTING,
+    G_DAMAGE_TYPE_IMPALING,
+};
+
+struct GAiData {
+    float m_desired_facing;
+
+};
 struct GEntity {
 public:
-    GEntityKind kind = GENTITY_KIND_NONE;
-    string name = "";
-    g_float2 position = { 0., 0. };
-    g_float2 velocity = { 0., 0. };
-    g_float2 facing = { 1., 0. };
-    float width = 1.;
-    float height = 1.;
-    int32_t health = 1;
-    float movement_speed = 80.;
-    bool is_player = false;;
+    GEntityKind m_kind = GENTITY_KIND_NONE;
+    string m_name = "";
+    g_float2 m_position = { 0., 0. };
+    g_float2 m_velocity = { 0., 0. };
+    g_float2 m_facing = { 1., 0. };
+    float m_width = 1.;
+    float m_height = 1.;
+    int32_t m_health = 1;
+    float m_movement_speed = 80.;
+    bool m_is_player = false;
+    GAiData m_ai_data;
+    //functions;
     void on_tick(float delta_time);
     void on_tick_paused(float delta_time);
     void on_render();
     GBounds get_bounds()const;
     void handle_movement(float delta_time, g_float2 input_direction);
-    void fire_weapon();
+    void fire_weapon(float delta_time);
+    void apply_damage(int32_t damage, GDamageType damage_type);
+    void on_tick_player(float delta_time);
+    void on_tick_enemy(float delta_time);
 };
 
 
@@ -118,9 +133,11 @@ void game_render();
 void menu_render();
 GWorld game_generate_world();
 GEntity* new_entity(GEntity et);
+void delete_entity(GEntity* et);
 void game_setup(GEntity* previous_player);
 
 void spawn_particle(GParticle particle);
 
 void particle_updates(float delta_time);
 void particle_rendering(float delta_time);
+int32_t roll(size_t dice_count);
