@@ -3,50 +3,73 @@
 #include "utils.h"
 #include "gui.h"
 #include <raylib.h>
+#include <raymath.h>
 #include <assert.h>
-#define WORLD_TILE_DIM 128
-#define WORLD_TILE_SIZE 32
-struct Bounds {
+#define WORLD_TILE_DIM 256
+#define WORLD_TILE_SIZE 40
+
+enum GParticleKind {
+    GPARTICLE_PARTICLE, GPARTICLE_LINE, GPARTICLE_SQUARE,
+};
+
+struct GParticle {
+    g_float2 pos = { 0.0, 0.0 };
+    g_float2 pos2 = { 0.0, 0.0 };
+    float width = 0.;
+    float height = 0.;
+    float radius = 0.;
+    float rotation = 0.;
+    g_float2 velocity = { 0.0, 0.0 };
+    GParticleKind kind = GPARTICLE_PARTICLE;
+    Color color = RED;
+    float remaining_lifetime = 0.;
+    bool exists = false;
+};
+
+struct GBounds {
     int32_t x;
     int32_t y;
     int32_t width;
     int32_t height;
 };
 
-enum EntityKind {
-    ENTITY_KIND_NONE,
-    ENTITY_KIND_PLAYER,
-    ENTITY_KIND_ENEMY,
+enum GEntityKind {
+    GENTITY_KIND_NONE,
+    GENTITY_KIND_PLAYER,
+    GENTITY_KIND_ENEMY,
 };
 
-struct Entity {
+struct GEntity {
 public:
-    EntityKind kind = ENTITY_KIND_NONE;
+    GEntityKind kind = GENTITY_KIND_NONE;
     string name = "";
-    float2 position = { 0., 0. };
-    float2 velocity = { 0., 0. };
-    float2 facing = { 1., 0. };
+    g_float2 position = { 0., 0. };
+    g_float2 velocity = { 0., 0. };
+    g_float2 facing = { 1., 0. };
     float width = 1.;
     float height = 1.;
     int32_t health = 1;
+    float movement_speed = 80.;
     bool is_player = false;;
     void on_tick(float delta_time);
     void on_tick_paused(float delta_time);
     void on_render();
-    Bounds get_bounds()const;
+    GBounds get_bounds()const;
+    void handle_movement(float delta_time, g_float2 input_direction);
+    void fire_weapon();
 };
 
 
-struct Tile {
+struct GTile {
     bool is_occupied;
 };
-struct World {
-    unique_ptr<array <array<Tile, WORLD_TILE_DIM>, WORLD_TILE_DIM>> tiles;
-    inline Tile& operator[](int32_t x, int32_t y) {
+struct GWorld {
+    unique_ptr<array <array<GTile, WORLD_TILE_DIM>, WORLD_TILE_DIM>> tiles;
+    inline GTile& operator[](int32_t x, int32_t y) {
         assert(0 <= x && 0 <= y && x < (*tiles)[0].size() && y < (*tiles).size());
         return (*tiles)[y][x];
     }
-    inline const Tile& operator[](int32_t x, int32_t y)const {
+    inline const GTile& operator[](int32_t x, int32_t y)const {
         assert(0 <= x && 0 <= y && x < (*tiles)[0].size() && y < (*tiles).size());
         return (*tiles)[y][x];
     }
@@ -57,31 +80,33 @@ struct World {
         return (*tiles).size();
     }
 };
-struct RaycastResult {
+
+struct GRaycastResult {
     bool hit = false;
-    float2 pos = { 0.0, 0.0 };
-    float2 normal = { 0., 0. };
-    Entity* hit_entity = nullptr;
+    g_float2 pos = { 0.0, 0.0 };
+    g_float2 normal = { 0., 0. };
+    GEntity* hit_entity = nullptr;
 };
-struct Game {
+struct GGame {
     bool is_running;
     bool should_exit;
     bool is_paused;
-    World world;
-    PtrSet<Entity> entities;
-    vector<Entity* > destroy_queue;
+    GWorld world;
+    GPtrSet<GEntity> entities;
+    vector<GEntity* > destroy_queue;
+    vector<GParticle> particles;
     GUI gui;
-    bool check_collision_rect(Bounds b);
-    RaycastResult raycast(float2 start, float2 end);
+    bool check_collision_rect(GBounds b);
+    GRaycastResult raycast(g_float2 start, g_float2 end, const vector<GEntity*>& ignored_entities);
 };
 
-extern Game game;
+extern GGame game;
 
-extern constexpr Vector2 to_rl(float2 p);
-extern constexpr float2 to_game(Vector2 p);
-Game* get_game();
-World* get_world();
-vector<Entity*> get_entities();
+extern constexpr Vector2 to_rl(g_float2 p);
+extern constexpr g_float2 to_game(Vector2 p);
+GGame* get_game();
+GWorld* get_world();
+vector<GEntity*> get_entities();
 GUI* get_gui();
 void game_update();
 void game_load_world(string_view path);
@@ -91,8 +116,11 @@ void gameloop();
 void menu_update();
 void game_render();
 void menu_render();
-World game_generate_world();
-Entity* new_entity(Entity et);
-void game_setup(Entity* previous_player);
+GWorld game_generate_world();
+GEntity* new_entity(GEntity et);
+void game_setup(GEntity* previous_player);
 
+void spawn_particle(GParticle particle);
 
+void particle_updates(float delta_time);
+void particle_rendering(float delta_time);

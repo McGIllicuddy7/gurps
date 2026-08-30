@@ -1,18 +1,21 @@
 
 #include "game.h"
 
-Game game;
+GGame game;
 void game_tick();
-extern constexpr Vector2 to_rl(float2 p) {
+extern constexpr Vector2 to_rl(g_float2 p) {
     return { p.x, p.y };
 }
-extern constexpr float2 to_game(Vector2 p) {
+
+extern constexpr g_float2 to_game(Vector2 p) {
     return { p.x, p.y };
 }
-World* get_world() {
+
+GWorld* get_world() {
     return &game.world;
 }
-vector<Entity*> get_entities() {
+
+vector<GEntity*> get_entities() {
     return game.entities.values();
 }
 
@@ -35,7 +38,7 @@ void game_teardown() {
 
 void gameloop() {
     InitWindow(1000, 800, "gurps");
-    SetTargetFPS(61);
+    //  SetTargetFPS(61);
     SetExitKey(0);
     while (!WindowShouldClose()) {
         get_game()->should_exit = false;
@@ -62,25 +65,27 @@ void menu_update() {
     menu_render();
 }
 
-Game* get_game() {
+GGame* get_game() {
     return &game;
 }
+
 void menu_teardown() {
 
 
 }
+
 void game_render() {
     get_gui()->begin_frame();
     BeginDrawing();
     ClearBackground(BLACK);
-    World* world = get_world();
+    GWorld* world = get_world();
     int32_t player_x = 0;
     int32_t player_y = 0;
     int32_t x_off = 0;
     int32_t y_off = 0;
     Vector2 player_pos = { 500., 400. };
     Vector2 player_facing = Vector2{ 1., 0. };
-    get_game()->entities.for_each([&](Entity& i) {
+    get_game()->entities.for_each([&](GEntity& i) {
         if (i.is_player) {
             player_x = round(i.position.x / WORLD_TILE_SIZE);
             player_y = round(i.position.y / WORLD_TILE_SIZE);
@@ -115,10 +120,12 @@ void game_render() {
             DrawRectangle((x)*tile_size_px - tile_size_px / 2, (y)*tile_size_px - tile_size_px / 2, tile_size_px, tile_size_px, col);
         }
     }
-    get_game()->entities.for_each([](Entity& i) {
+    get_game()->entities.for_each([](GEntity& i) {
         i.on_render();
         });
+    particle_rendering(GetFrameTime());
     EndScissorMode();
+
     EndMode2D();
     /*
     get_gui()->begin_panel(100, 100, 600, 400);
@@ -131,6 +138,7 @@ void game_render() {
     */
     get_gui()->end_frame();
     get_gui()->render();
+    DrawFPS(10, 10);
     EndDrawing();
 }
 
@@ -152,32 +160,36 @@ void menu_render() {
     get_gui()->render();
     EndDrawing();
 }
+
 GUI* get_gui() {
     return &game.gui;
 }
+
 void game_tick() {
     float delta_time = GetFrameTime();
     if (!get_game()->is_paused) {
-        get_game()->entities.for_each([=](Entity& i) {
+        get_game()->entities.for_each([=](GEntity& i) {
             i.on_tick(delta_time);
             });
+        particle_updates(delta_time);
     }
     else {
-        get_game()->entities.for_each([=](Entity& i) {
+        get_game()->entities.for_each([=](GEntity& i) {
             i.on_tick_paused(delta_time);
             });
     }
 }
 
-void game_setup(Entity* previous_player) {
+void game_setup(GEntity* previous_player) {
+    game.particles.clear();
     if (previous_player) {
-        Entity player = *previous_player;
+        GEntity player = *previous_player;
         get_game()->entities.clear();
         new_entity(player);
     }
     else {
-        Entity player = { };
-        player.kind = ENTITY_KIND_PLAYER;
+        GEntity player = { };
+        player.kind = GENTITY_KIND_PLAYER;
         player.is_player = true;
         player.position = { 0., 0. };
         player.facing = { 1., 0. };
@@ -188,12 +200,12 @@ void game_setup(Entity* previous_player) {
     }
 }
 
-bool Game::check_collision_rect(Bounds b) {
+bool GGame::check_collision_rect(GBounds b) {
     int32_t base_x = b.x / WORLD_TILE_SIZE;
     int32_t base_y = b.y / WORLD_TILE_SIZE;
     for (int32_t dy = -1; dy <= 1; dy++) {
         for (int32_t dx = -1; dx <= 1; dx++) {
-            Bounds b2 = Bounds{ .x = (base_x + dx) * WORLD_TILE_SIZE - WORLD_TILE_SIZE / 2, .y = (base_y + dy) * WORLD_TILE_SIZE - WORLD_TILE_SIZE / 2, .width = WORLD_TILE_SIZE,.height = WORLD_TILE_SIZE };
+            GBounds b2 = GBounds{ .x = (base_x + dx) * WORLD_TILE_SIZE - WORLD_TILE_SIZE / 2, .y = (base_y + dy) * WORLD_TILE_SIZE - WORLD_TILE_SIZE / 2, .width = WORLD_TILE_SIZE,.height = WORLD_TILE_SIZE };
             Rectangle r1 = { .x = float(b.x), .y = float(b.y), .width = float(b.width), .height = float(b.height) };
             Rectangle r2 = { .x = float(b2.x), .y = float(b2.y), .width = float(b2.width), .height = float(b2.height) };
             if (CheckCollisionRecs(r1, r2)) {
@@ -210,7 +222,7 @@ bool Game::check_collision_rect(Bounds b) {
     }
     return false;
 }
-bool check_raycast_rectangle(float2 start, float2 end, Rectangle r, float2* output, float2* normal) {
+bool check_raycast_rectangle(g_float2 start, g_float2 end, Rectangle r, g_float2* output, g_float2* normal) {
     Vector2 sv = { start.x, start.y };
     Vector2 ev = { end.x, end.y };
     if (CheckCollisionPointRec(sv, r)) {
@@ -218,7 +230,7 @@ bool check_raycast_rectangle(float2 start, float2 end, Rectangle r, float2* outp
             *output = start;
         }
         if (normal) {
-            *normal = (end - start) / (end - start).len();
+            *normal = Vector2Normalize(ev - sv);
         }
         return true;
     }
@@ -227,13 +239,13 @@ bool check_raycast_rectangle(float2 start, float2 end, Rectangle r, float2* outp
     Vector2 r2 = { r.x , r.y + r.height };
     Vector2 r3 = { r.x + r.width, r.y + r.height };
     Vector2 tmp;
-    float2 nearest_point = end;
-    float nearest_distance = (end - start).len();
+    g_float2 nearest_point = end;
+    float nearest_distance = Vector2Length(end - start);
     bool hit = false;
-    float2 nearest_normal = { 1., 0.0 };
+    g_float2 nearest_normal = { 1., 0.0 };
     if (CheckCollisionLines(sv, ev, r0, r1, &tmp)) {
-        float2 t = { tmp.x, tmp.y };
-        float dist = (t - start).len();
+        g_float2 t = { tmp.x, tmp.y };
+        float dist = Vector2Length(t - start);
         if (dist < nearest_distance) {
             nearest_point = t;
             nearest_distance = dist;
@@ -242,8 +254,8 @@ bool check_raycast_rectangle(float2 start, float2 end, Rectangle r, float2* outp
         }
     }
     if (CheckCollisionLines(sv, ev, r0, r2, &tmp)) {
-        float2 t = { tmp.x, tmp.y };
-        float dist = (t - start).len();
+        g_float2 t = { tmp.x, tmp.y };
+        float dist = Vector2Length(t - start);
         if (dist < nearest_distance) {
             nearest_point = t;
             nearest_distance = dist;
@@ -252,8 +264,8 @@ bool check_raycast_rectangle(float2 start, float2 end, Rectangle r, float2* outp
         }
     }
     if (CheckCollisionLines(sv, ev, r1, r3, &tmp)) {
-        float2 t = { tmp.x, tmp.y };
-        float dist = (t - start).len();
+        g_float2 t = { tmp.x, tmp.y };
+        float dist = Vector2Length(t - start);
         if (dist < nearest_distance) {
             nearest_point = t;
             nearest_distance = dist;
@@ -262,8 +274,8 @@ bool check_raycast_rectangle(float2 start, float2 end, Rectangle r, float2* outp
         }
     }
     if (CheckCollisionLines(sv, ev, r2, r3, &tmp)) {
-        float2 t = { tmp.x, tmp.y };
-        float dist = (t - start).len();
+        g_float2 t = { tmp.x, tmp.y };
+        float dist = Vector2Length(t - start);
         if (dist < nearest_distance) {
             nearest_point = t;
             nearest_distance = dist;
@@ -282,24 +294,24 @@ bool check_raycast_rectangle(float2 start, float2 end, Rectangle r, float2* outp
     return hit;
 }
 
-RaycastResult Game::raycast(float2 start, float2 end) {
+GRaycastResult GGame::raycast(g_float2 start, g_float2 end, const vector<GEntity*>& ignored_entities) {
     if (end == start) {
         return {};
     }
-    float2 closest = start;
-    float closest_dist = (end - start).len();
-    float2 closest_normal = { 1., 0.0 };
+    g_float2 closest = start;
+    float closest_dist = Vector2Length(end - start);
+    g_float2 closest_normal = { 1., 0.0 };
     bool hit_something = false;
-    Entity* hit_entity = nullptr;
+    GEntity* hit_entity = nullptr;
     for (int32_t y = 0; y < WORLD_TILE_DIM; y++) {
         for (int32_t x = 0; x < WORLD_TILE_DIM; x++) {
             if ((*get_world())[x, y].is_occupied) {
-                float2 pos = { float(x) * WORLD_TILE_SIZE, float(y) * WORLD_TILE_SIZE };
+                g_float2 pos = { float(x) * WORLD_TILE_SIZE, float(y) * WORLD_TILE_SIZE };
                 Rectangle r = Rectangle{ .x = pos.x - WORLD_TILE_SIZE / 2, .y = pos.y - WORLD_TILE_SIZE / 2, .width = WORLD_TILE_SIZE, .height = WORLD_TILE_SIZE };
-                float2 tpos;
-                float2 tnorm;
+                g_float2 tpos;
+                g_float2 tnorm;
                 if (check_raycast_rectangle(start, end, r, &tpos, &tnorm)) {
-                    float len = (tpos - start).len();
+                    float len = Vector2Length((tpos - start));
                     if (len < closest_dist) {
                         closest = tpos;
                         closest_normal = tnorm;
@@ -310,13 +322,18 @@ RaycastResult Game::raycast(float2 start, float2 end) {
             }
         }
     }
-    entities.for_each([&](Entity& i) {
-        Bounds b = i.get_bounds();
+    entities.for_each([&](GEntity& i) {
+        for (const auto& j : ignored_entities) {
+            if (&i == j) {
+                return;
+            }
+        }
+        GBounds b = i.get_bounds();
         Rectangle r = { float(b.x), float(b.y), float(b.width), float(b.height) };
-        float2 tpos;
-        float2 tnorm;
+        g_float2 tpos;
+        g_float2 tnorm;
         if (check_raycast_rectangle(start, end, r, &tpos, &tnorm)) {
-            float len = (tpos - start).len();
+            float len = Vector2Length(tpos - start);
             if (len < closest_dist) {
                 closest = tpos;
                 closest_normal = tnorm;
@@ -325,7 +342,7 @@ RaycastResult Game::raycast(float2 start, float2 end) {
                 hit_entity = &i;
             }
         }});
-        RaycastResult out = {};
+        GRaycastResult out = {};
         if (hit_something) {
             out.hit = true;
             out.normal = closest_normal;
@@ -333,4 +350,45 @@ RaycastResult Game::raycast(float2 start, float2 end) {
             out.pos = closest;
         }
         return out;
+}
+
+void particle_updates(float delta_time) {
+    for (GParticle& i : game.particles) {
+        if (i.exists) {
+            i.pos += i.velocity * delta_time;
+            i.remaining_lifetime -= delta_time;
+            if (i.remaining_lifetime < 0.) {
+                i.exists = false;
+            }
+        }
+    }
+}
+
+void particle_rendering(float delta_time) {
+    (void)delta_time;
+    for (const GParticle& i : game.particles) {
+        if (i.exists) {
+            switch (i.kind) {
+            case GPARTICLE_LINE: {
+                DrawLine(i.pos.x, i.pos.y, i.pos2.x, i.pos2.y, i.color);
+            }
+            case GPARTICLE_PARTICLE: {
+                DrawCircle(i.pos.x, i.pos.y, i.radius, i.color);
+            }
+            case GPARTICLE_SQUARE: {
+                DrawRectanglePro(Rectangle{ i.pos.x - i.pos.x / 2, i.pos.y - i.height / 2 }, { 0., 0.0 }, i.rotation, i.color);
+            }
+            }
+        }
+    }
+}
+
+void spawn_particle(GParticle particle) {
+    for (GParticle& i : game.particles) {
+        if (!i.exists) {
+            i = particle;
+            return;
+        }
+    }
+    game.particles.push_back(particle);
 }
