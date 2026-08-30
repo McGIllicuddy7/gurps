@@ -117,6 +117,10 @@ void GEntity::fire_weapon(float delta_time) {
 }
 void GEntity::apply_damage(int32_t damage, GDamageType damage_type) {
     (void)damage_type;
+    damage -= 8;
+    if (damage < 0) {
+        damage = 0;
+    }
     m_health -= damage;
     printf("entity took:%d damage\n", damage);
     if (m_health < 0) {
