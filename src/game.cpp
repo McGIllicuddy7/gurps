@@ -1,6 +1,6 @@
 
 #include "game.h"
-
+#include <unordered_set>
 GGame game;
 void game_tick();
 extern constexpr Vector2 to_rl(g_float2 p) {
@@ -194,8 +194,8 @@ void game_setup(GEntity* previous_player) {
         player.position = { 0., 0. };
         player.facing = { 1., 0. };
         player.health = 10;
-        player.height = 20;
-        player.width = 20;
+        player.height = 16;
+        player.width = 16;
         new_entity(player);
     }
 }
@@ -303,16 +303,37 @@ GRaycastResult GGame::raycast(g_float2 start, g_float2 end, const vector<GEntity
     g_float2 closest_normal = { 1., 0.0 };
     bool hit_something = false;
     GEntity* hit_entity = nullptr;
-    for (int32_t y = 0; y < WORLD_TILE_DIM; y++) {
-        for (int32_t x = 0; x < WORLD_TILE_DIM; x++) {
-            if ((*get_world())[x, y].is_occupied) {
-                g_float2 pos = { float(x) * WORLD_TILE_SIZE, float(y) * WORLD_TILE_SIZE };
-                Rectangle r = Rectangle{ .x = pos.x - WORLD_TILE_SIZE / 2, .y = pos.y - WORLD_TILE_SIZE / 2, .width = WORLD_TILE_SIZE, .height = WORLD_TILE_SIZE };
+    vector<g_int2> queue;
+    queue.reserve(8 * (Vector2Length(end - start) / WORLD_TILE_SIZE));
+    queue.push_back({ (int)round(start.x / (WORLD_TILE_SIZE)), (int)round(start.y / (WORLD_TILE_SIZE)) });
+    std::unordered_set<g_int2> reached;
+    reached.reserve(8 * (Vector2Length(end - start) / WORLD_TILE_SIZE));
+    while (!queue.empty()) {
+        g_int2 p = queue[queue.size() - 1];
+        queue.pop_back();
+        int32_t x = p.x;
+        int32_t y = p.y;
+        for (int32_t dy = -1; dy <= 1; dy++) {
+            for (int32_t dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) {
+                    continue;
+                }
+                g_int2 p2 = { x + dx, y + dy };
+                if (reached.contains(p2)) {
+                    continue;
+                }
+                if (p2.x < 0 || p2.y < 0 || p2.x >= WORLD_TILE_DIM || p2.y >= WORLD_TILE_DIM) {
+                    continue;
+                }
+                g_float2 pos = { float(p2.x) * WORLD_TILE_SIZE, float(p2.y) * WORLD_TILE_SIZE };
+                Rectangle r = Rectangle{ .x = pos.x - WORLD_TILE_SIZE / 2 , .y = pos.y - WORLD_TILE_SIZE / 2,.width = WORLD_TILE_SIZE , .height = WORLD_TILE_SIZE };
                 g_float2 tpos;
                 g_float2 tnorm;
                 if (check_raycast_rectangle(start, end, r, &tpos, &tnorm)) {
                     float len = Vector2Length((tpos - start));
-                    if (len < closest_dist) {
+                    queue.push_back(p2);
+                    reached.insert(p2);
+                    if (len < closest_dist && this->world[p2.x, p2.y].is_occupied) {
                         closest = tpos;
                         closest_normal = tnorm;
                         hit_something = true;

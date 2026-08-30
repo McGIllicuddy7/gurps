@@ -28,7 +28,7 @@ void GEntity::on_tick(float delta_time) {
             p.pos2 = rc.pos;
             p.pos = position;
             p.kind = GPARTICLE_LINE;
-            p.remaining_lifetime = .2;
+            p.remaining_lifetime = delta_time;
             spawn_particle(p);
 
         }
@@ -39,7 +39,7 @@ void GEntity::on_tick(float delta_time) {
             p.pos2 = position + facing * 3000;
             p.pos = position;
             p.kind = GPARTICLE_LINE;
-            p.remaining_lifetime = .2;
+            p.remaining_lifetime = delta_time;
             spawn_particle(p);
 
         }
@@ -52,9 +52,10 @@ void GEntity::on_tick_paused(float delta_time) {
     return;
 }
 void GEntity::on_render() {
-    DrawCircle(position.x, position.y, 10, RED);
+
+    DrawCircle(position.x, position.y, WORLD_TILE_SIZE, RED);
     g_float2 dt = Vector2Rotate(facing, PI / 2.);
-    DrawLine(position.x + dt.x * 5, position.y + dt.y * 5, position.x + dt.x * 5 + facing.x * 20, position.y + dt.y * 5 + facing.y * 20, BLACK);
+    DrawLine(position.x + dt.x * 2, position.y + dt.y * 2, position.x + dt.x * 2 + facing.x * 10, position.y + dt.y * 2 + facing.y * 10, BLACK);
 }
 GEntity* new_entity(GEntity et) {
     return get_game()->entities.create(et);

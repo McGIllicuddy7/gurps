@@ -46,6 +46,13 @@ struct g_int2 {
         return sqrt(x * x + y * y);
     }
 };
+template<> struct std::hash<g_int2> {
+    inline uint64_t operator()(const g_int2& v) const {
+        uint64_t a = std::bit_cast<uint32_t>(v.x);
+        uint64_t b = std::bit_cast<uint32_t>(v.y);
+        return (a << 32 | b);
+    }
+};
 
 using g_float2 = Vector2;
 using g_float3 = Vector3;

@@ -5,8 +5,8 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <assert.h>
-#define WORLD_TILE_DIM 256
-#define WORLD_TILE_SIZE 40
+#define WORLD_TILE_DIM 4096
+#define WORLD_TILE_SIZE 32
 
 enum GParticleKind {
     GPARTICLE_PARTICLE, GPARTICLE_LINE, GPARTICLE_SQUARE,
