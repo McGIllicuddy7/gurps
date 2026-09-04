@@ -1,6 +1,6 @@
 #include "utils.h"
 #include "string.h"
-
+#include <cstdarg>
 void GTimerManager::update(float delta_time) {
         vector<GTimer *> done;
         m_timers.for_each([&](GTimer &timer) {
@@ -64,4 +64,21 @@ void write_bytes_to_file(string_view path, arr<uint8_t> bytes) {
         assert(f);
         fwrite(bytes.begin(), 1, bytes.size(), f);
         fclose(f);
+}
+
+string str_format(const char * fmt,...){
+        va_list args;
+        va_list args2;
+        va_start(args, fmt);
+        va_copy(args2, args);
+        int32_t count = vsnprintf(0, 0, fmt, args);
+        va_end(args);
+        string out;
+        out.reserve(count+1);
+        for(int i =0; i<count+1; i++){
+                out.push_back('x');
+        }
+        vsnprintf(&out[0], count+1, fmt, args2);
+        va_end(args2);
+        return out;
 }

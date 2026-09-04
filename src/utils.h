@@ -212,3 +212,4 @@ class GTimerManager {
 
 vector<uint8_t> read_file_to_bytes(string_view path);
 void write_bytes_to_file(string_view path, arr<uint8_t> bytes);
+string str_format(const char * fmt,...);
