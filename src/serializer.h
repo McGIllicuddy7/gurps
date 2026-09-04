@@ -17,18 +17,16 @@ public:
 };
 
 
-template<typename T>  inline const char * typename_of(){
+template<typename T>  inline string typename_of(){
 	static_assert(false);
 }
- template<>  inline const char *typename_of<int32_t>(){
-	return "int32_t";
-} 
+
 
 template<typename T> void serialize(BiteStream & stream, const T& value){
 	static_assert(std::is_trivially_copyable<T>());
-	const char * sz = typename_of<T>();
-	printf("name of type:%s\n", sz);
-	stream.write_bytes((const uint8_t*)sz, strlen(sz)+1);
+	static_assert(std::is_trivially_destructible<T>());
+	uint32_t sz = sizeof(T);
+	stream.write_bytes((uint8_t*)&sz, sizeof(sz));
 	if constexpr(std::is_pointer<T>()){
 		if(value){
 			stream.write_byte(1);
@@ -41,29 +39,55 @@ template<typename T> void serialize(BiteStream & stream, const T& value){
 	}
 }
 
-template<typename T> T deserialize(BiteStream & stream){
+template<typename T> void deserialize(BiteStream & stream, T& out_param){
 	static_assert(std::is_trivially_copyable<T>());
-	
-	const char * sz = typename_of<T>();
-	do{
-		uint8_t x;
-		assert(stream.read_byte(x));
-		assert(x ==*sz); 
-	}while(*(sz++));	
+	static_assert(std::is_trivially_destructible<T>());
+	uint32_t sz;
+	assert(stream.read_bytes((uint8_t*)&sz, sizeof(sz)));
 	if constexpr(std::is_pointer<T>()){
 		uint8_t value;
 		assert(stream.read_byte(value));
 		if(value){
-			return new std::remove_pointer<T> (deserialize<std::remove_pointer<T>>);
+			out_param = new std::remove_pointer<T> (deserialize<std::remove_pointer<T>>);
 		}else{
-			return nullptr;
+			out_param = nullptr;
 		}
 	}else{
 		uint8_t output[sizeof(T)];
 		assert(stream.read_bytes(output, sizeof(T)));
-		return *(T*)(output);
+		out_param = *(T*)(output);
 	}
-
 }
 
+template<typename T> void serialize(BiteStream & stream, const vector<T>& list){
+	uint64_t count = list.size();
+	serialize(stream, count);
+	for(size_t i =0; i<list.size(); i++){
+		serialize(stream, list[i]);
+	}
+}
+template<typename T> void deserialize(BiteStream & stream, vector<T>& list){
+	uint64_t count;
+	list.clear();
+	deserialize(stream, count);
+	for(size_t i =0; i<count; i++){
+		T tmp;
+		deserialize(stream, tmp);
+		list.push_back(tmp);
+	}
+}
 
+template<> inline void serialize(BiteStream&stream, const std::string& str){
+	uint64_t count = str.size();
+	serialize(stream, count);
+	stream.write_bytes((uint8_t*)&str[0], count);
+}
+template<> inline void deserialize(BiteStream& stream, std::string& str){
+	uint64_t count;
+	deserialize(stream, count);
+	str.clear();
+	for(size_t i =0; i<count; i++){
+		str.push_back('a');
+	}
+	stream.read_bytes((uint8_t*)&str[0], count);
+}
