@@ -17,9 +17,16 @@ public:
 };
 
 
+template<typename T>  inline const char * typename_of(){
+	static_assert(false);
+}
+ template<>  inline const char *typename_of<int32_t>(){
+	return "int32_t";
+} 
+
 template<typename T> void serialize(BiteStream & stream, const T& value){
 	static_assert(std::is_trivially_copyable<T>());
-	const char * sz = typeid(T).name();
+	const char * sz = typename_of<T>();
 	printf("name of type:%s\n", sz);
 	stream.write_bytes((const uint8_t*)sz, strlen(sz)+1);
 	if constexpr(std::is_pointer<T>()){
@@ -37,7 +44,7 @@ template<typename T> void serialize(BiteStream & stream, const T& value){
 template<typename T> T deserialize(BiteStream & stream){
 	static_assert(std::is_trivially_copyable<T>());
 	
-	const char * sz = typeid(T).name();	
+	const char * sz = typename_of<T>();
 	do{
 		uint8_t x;
 		assert(stream.read_byte(x));
