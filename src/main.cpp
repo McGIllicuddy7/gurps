@@ -2,41 +2,49 @@
 #include "gui.h"
 #include "serializer.h"
 #include "utils.h"
+using std::make_unique;
 #include <stdio.h> 
-struct FuckYou{
-	string msg;
-	size_t idx;
+struct Person{
+	string name;
+	int32_t age;	
 };
-template<> inline void frd_serialize(BiteStream & stream, const FuckYou & fuck){
-	stream.serialize(fuck.msg);
-	stream.serialize(fuck.idx);
-}
 
-template<> inline void frd_deserialize(BiteStream & stream, FuckYou & fuck){
-	stream.deserialize(fuck.msg);
-	stream.deserialize(fuck.idx);
-}
+MAKE_SERIALIZABLE(Person, stream, value,{
+	stream.serialize(value.name); 
+	stream.serialize(value.age);
+});
+
+MAKE_DESERIALIZABLE(Person, stream, value,{
+	stream.deserialize(value.name); 
+	stream.deserialize(value.age);
+});
 
 int main() {
-	bool should_serialize =false;
-
+	srand(time(0));
+	bool should_serialize = false;
 	if (should_serialize){
+		vector<unique_ptr<Person>> people;
+		for(int32_t i =0; i<1000; i++){
+			Person p{str_format("henlo: %d", i), i*3+2};
+			if(random()%4 !=0){
+				people.push_back(std::move(make_unique<Person>(Person(p))));
+			}else{
+				people.push_back(unique_ptr<Person>());
+			}
+		}
 		BiteStream c;
-		FuckYou fuck,u;
-		fuck.idx = 420;
-		fuck.msg = "god hates fags lmaoooooo";
-		u.idx = 69;
-		u.msg = "google image search frotting";
-		c.serialize(fuck);
-		c.serialize(u);
+		c.serialize(people);
 		write_bytes_to_file("test.txt",c.get_data());
 	}else{
 		BiteStream bites = BiteStream::from_file(read_file_to_bytes("test.txt"));
-		vector<string> strs;
-		FuckYou fuck,u;
-		bites.deserialize(fuck);
-		bites.deserialize(u);
-		printf("%zu,%s\n", fuck.idx, fuck.msg.c_str());
-		printf("%zu,%s\n", u.idx, u.msg.c_str());
+		vector<unique_ptr<Person>> people;
+		bites.deserialize(people);
+		for(size_t i =0; i<people.size(); i++){
+			if(people[i]){
+				printf("{%s, %d}\n", people[i]->name.c_str(), people[i]->age);
+			}else{
+				printf("null\n");
+			}
+		}	
 	}
 }

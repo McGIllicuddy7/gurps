@@ -25,10 +25,10 @@ public:
 };
 
 
-template<typename T>  inline string typename_of(){
-	static_assert(false);
-}
 
+class DeserializationOutofBytes:public std::exception{};
+
+class DeserializationWrongSize:public std::exception{};
 
 template<typename T> void frd_serialize(BiteStream & stream, const T& value){
 	static_assert(std::is_trivially_copyable<T>());
@@ -51,19 +51,23 @@ template<typename T> void frd_deserialize(BiteStream & stream, T& out_param){
 	static_assert(std::is_trivially_copyable<T>());
 	static_assert(std::is_trivially_destructible<T>());
 	uint32_t sz;
-	assert(stream.read_bytes((uint8_t*)&sz, sizeof(sz)));
+	if(!(stream.read_bytes((uint8_t*)&sz, sizeof(sz)))){
+		throw DeserializationWrongSize{};
+	}
 	if constexpr(std::is_pointer<T>()){
 		uint8_t value;
 		assert(stream.read_byte(value));
 		if(value){
-			out_param = new std::remove_pointer<T> ();
+			out_param = new typename std::remove_pointer<T>::type ();
 			frd_deserialize(stream, *out_param);
 		}else{
 			out_param = nullptr;
 		}
 	}else{
 		uint8_t output[sizeof(T)];
-		assert(stream.read_bytes(output, sizeof(T)));
+		if(!(stream.read_bytes(output, sizeof(T)))){
+			throw DeserializationOutofBytes{};
+		}
 		out_param = *(T*)(output);
 	}
 }
@@ -82,7 +86,7 @@ template<typename T> void frd_deserialize(BiteStream & stream, vector<T>& list){
 	for(size_t i =0; i<count; i++){
 		T tmp;
 		frd_deserialize(stream, tmp);
-		list.push_back(tmp);
+		list.push_back(std::move(tmp));
 	}
 }
 
@@ -99,5 +103,24 @@ template<> inline void frd_deserialize(BiteStream& stream, std::string& str){
 	for(size_t i =0; i<count; i++){
 		str.push_back('a');
 	}
-	stream.read_bytes((uint8_t*)&str[0], count);
+	if(!stream.read_bytes((uint8_t*)&str[0], count)){
+		throw DeserializationOutofBytes{};
+	}
+}
+
+#define MAKE_SERIALIZABLE(T,stream, value,EXPR)\
+template<> inline void frd_serialize(BiteStream& stream, const T& value) EXPR
+
+#define MAKE_DESERIALIZABLE(T,stream, out_param,EXPR)\
+template<> inline void frd_deserialize(BiteStream& stream, T& out_param) EXPR
+
+
+template<typename T> void frd_serialize(BiteStream & stream, const std::unique_ptr<T>& ptr){
+	frd_serialize(stream, ptr.get());
+}
+
+template<typename T> void frd_deserialize(BiteStream & stream, std::unique_ptr<T>& ptr){
+	T* ptr_ptr = ptr.get();
+	frd_deserialize(stream, ptr_ptr);
+	ptr = unique_ptr<T>(ptr_ptr);
 }
