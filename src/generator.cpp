@@ -11,3 +11,9 @@ GWorld game_generate_world() {
         }
         return out;
 }
+
+
+vector<g_int2> pathfind(GWorld& world,g_int2 from, g_int2 to){	
+	vector<g_int2> open_set = {from};
+	todo();
+}

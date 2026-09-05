@@ -163,3 +163,4 @@ int32_t roll(size_t dice_count);
 void player_died();
 void spawn_enemy(int32_t level);
 GEntity *get_player_entity();
+vector<g_float2> pathfind(GWorld& world,g_float2 from, g_float2 to);
