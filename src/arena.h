@@ -26,3 +26,9 @@ public:
 	}
 	void defer(std::function<void()> &&func);
 };
+
+class CStr{
+	bool is_owned;
+	char * ptr;
+	public:
+};
