@@ -1,4 +1,5 @@
 #include "utils.hpp"
+#include <stdarg.h>
 void BiteStream::write_byte(u8 byte){
     m_bytes.push_back(byte);
 }
@@ -74,4 +75,57 @@ void BiteStream::write_to_file(const string& path)const {
 }
 BiteStream BiteStream::read_from_file(const string&path){
     return BiteStream::from_bytes(read_file_to_bytes(path));
+}
+
+Arena::Arena(){
+    m_bytes = make_unique<u8[]>(4096*4);
+    m_capacity = 4096*4;
+    m_next =0;
+}
+
+Arena::Arena(size_t capacity){
+    m_bytes = make_unique<u8[]>(capacity);
+    m_capacity = capacity;
+    m_next =0; 
+}
+
+Arena::~Arena(){
+    for(i32 i = m_destructor_queue.size()-1; i>= 0; i--){
+        (m_destructor_queue[i])();
+    }
+}
+
+void Arena::defer(function<void()> to_defer){
+    m_destructor_queue.push_back(to_defer);
+}
+
+void *Arena::alloc(size_t count){
+    if(count%16 !=0){
+        count += 16-count%16;
+    }
+    if(m_next+count>= m_capacity){
+        if(m_next_ptr){
+            return m_next_ptr->alloc(count);
+        }else{
+            m_next_ptr = unique_ptr<Arena>(new Arena(m_capacity*2));
+            return m_next_ptr->alloc(count);
+        }
+    }else{
+        void * out = &m_bytes[m_next];
+        m_next+= count;
+        return out;
+    }
+}
+
+char * fmt_string(Arena * arena, const char * fmt, ...){
+    va_list  args;
+    va_list args2;
+    va_start(args, fmt);
+    va_copy(args2,args);
+    size_t count=vsnprintf(0, 0, fmt, args);
+    char * out = (char*)arena->alloc(count+1);
+    vsnprintf(out, count+1, fmt, args2);
+    va_end(args);
+    va_end(args2);
+    return out;
 }

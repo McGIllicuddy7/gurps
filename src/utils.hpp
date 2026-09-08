@@ -441,3 +441,61 @@ vector<u8> read_file_to_bytes(const string& file_name);
 void write_bytes_to_file(const string& file_name, const vector<u8>& bites);
 
 
+class Arena{
+    unique_ptr<u8[]> m_bytes;
+    size_t m_capacity =0;
+    size_t m_next =0;
+    unique_ptr<Arena> m_next_ptr;
+    vector<function<void()>> m_destructor_queue;
+    public:
+    Arena();
+    Arena(size_t cap);
+    ~Arena();
+    void * alloc(size_t count); 
+    void defer(function<void()> to_defer);
+    template<typename T>T* create(T&& value){
+        T* out = (T*)this->alloc(sizeof(T));
+        new (out)T(value);
+        if constexpr(!std::is_trivially_destructible<T>()){
+            this->defer([=]{
+                out->~T();
+            });
+        }
+        return out;
+    }
+
+    template<typename T>T* create(const T& value){
+        T* out = (T*)this->alloc(sizeof(T));
+        new (out)T(value);
+        if constexpr(!std::is_trivially_destructible<T>()){
+            this->defer([=]{
+                out->~T();
+            });
+        }
+        return out;
+    }
+
+    template<typename T>T* create(){
+        T* out = (T*)this->alloc(sizeof(T));
+        new (out)T();
+        if constexpr(!std::is_trivially_destructible<T>()){
+            this->defer([=]{
+                out->~T();
+            });
+        }
+        return out;
+    }
+    template<typename T> Slice<T> create_slice(size_t count){
+        T* out = (T*)this->alloc(sizeof(T)*count);
+        for(size_t i =0; i<count; i++){
+            new (out+i)T();
+        }
+        return Slice<T>(out, count);
+    }
+
+    template<typename T> Slice<T> unsafe_create_slice_uninit(size_t count){
+        T* out = (T*)this->alloc(sizeof(T)*count);
+        return Slice<T>(out, count);
+    }
+};
+char * fmt_string(Arena * arena, const char * fmt, ...);
