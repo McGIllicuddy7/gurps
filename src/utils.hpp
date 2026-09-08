@@ -258,18 +258,31 @@ class BiteStream{
     static BiteStream read_from_file(const string & path);
 };
 
+
+
 template<typename T> void frd_serialize(BiteStream& stream,const T& v){
     static_assert(std::is_pod<T>(), "must be plain old data");
     if constexpr (std::is_pointer<T>()){
-        if(v){
-            u32 size =1;
-            stream.write_bytes((u8*)&size, sizeof(u32));
-            stream.write_byte(1);
-            frd_serialize(stream, *v);
+        if constexpr (std::is_same<T, char*>()){
+                if(v){
+                    u32 count = strlen(v);
+                    stream.write_bytes((u8*)&count, sizeof(count));
+                    stream.write_bytes((u8*)v, count);
+                }else{
+                    u32 count = 0;
+                    stream.write_bytes((u8*)&count, sizeof(count));
+                }
         }else{
-            u32 size =1;
-            stream.write_bytes((u8*)&size, sizeof(u32));
-            stream.write_byte(0);
+            if(v){
+                u32 size =1;
+                stream.write_bytes((u8*)&size, sizeof(u32));
+                stream.write_byte(1);
+                frd_serialize(stream, *v);
+            }else{
+                u32 size =1;
+                stream.write_bytes((u8*)&size, sizeof(u32));
+                stream.write_byte(0);
+            }
         }
     }else{
         u32 size = sizeof(T);
@@ -286,22 +299,36 @@ template<typename T>  [[nodiscard]] bool frd_deserialize(BiteStream& stream,T& v
         return false;
     }
     if constexpr (std::is_pointer<T>()){
-        if(size != 1){
-            return false;
-        }
-        u8 bl;
-        if(!stream.read_byte(bl)){
-            return false;
-        }
-        if (bl){
-            T out = new typename std::remove_pointer<T>::type ();
-            if(!frd_deserialize(stream, *out)){
-                delete out;
+        if constexpr(std::is_same<T, char *>()){
+            u8 is_null = (size == 0);
+            if(is_null){
+                v =0;
+                return true;
+            }
+            v = (char*)malloc(sizeof(size+1));
+            v[size] =0;
+            if(!stream.read_bytes((u8*)&v[0],size)){
                 return false;
             }
-            v = out;
+            return true;
         }else{
-            v = nullptr;
+            if(size != 1){
+                return false;
+            }
+            u8 bl;
+            if(!stream.read_byte(bl)){
+                return false;
+            }
+            if (bl){
+                T out = new typename std::remove_pointer<T>::type ();
+                if(!frd_deserialize(stream, *out)){
+                    delete out;
+                    return false;
+                }
+                v = out;
+            }else{
+                v = nullptr;
+            }
         }
     }else{
         u_int8_t output[sizeof(T)];
@@ -412,3 +439,5 @@ template<typename T, size_t count> [[nodiscard]] bool frd_deserialize(BiteStream
 
 vector<u8> read_file_to_bytes(const string& file_name);
 void write_bytes_to_file(const string& file_name, const vector<u8>& bites);
+
+

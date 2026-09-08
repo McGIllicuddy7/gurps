@@ -36,7 +36,8 @@ class Entity{
 struct EntityClass{
     string name; 
     Entity* (*spawn)(Vector2, float);
-
+    Entity* (*deserialize)(BiteStream& stream);
+    void (*serialize)(Entity* et, BiteStream &stream);
 };
 
 struct Wall{
