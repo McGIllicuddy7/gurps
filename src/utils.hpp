@@ -7,6 +7,7 @@
 #include <memory>
 #include <assert.h>
 #include <stdio.h>
+#include <stdarg.h>
 using std::vector;
 using std::array;
 using std::string;
@@ -529,4 +530,158 @@ template<> [[nodiscard]]inline bool frd_deserialize(BiteStream& stream, Type& k_
     return frd_deserialize_fields(stream, ARGS);\
 }\
 
+template<size_t SIZE>struct BufferStr{
+    char buffer[SIZE];
+    inline BufferStr(){
+        memset(buffer, 0,sizeof(buffer));
+    }
+    inline BufferStr(const char * s){
+        size_t len = strlen(s);
+        assert(len< SIZE-1);
+        memset(buffer, 0, sizeof(buffer));
+        for(size_t i =0; i<len;i++){
+            buffer[i] = s[i];
+        }
+    }
+    inline BufferStr(const std::string_view  view){
+        assert(view.size()<= SIZE-1);
+        size_t len = view.size();
+        for(size_t i =0; i<len;i++){
+            buffer[i] = view[i];
+        }
+        buffer[len+1] = 0;
+    }
+    inline char & operator[](size_t idx){
+        assert(idx<= strlen(buffer));
+        return buffer[idx];
+    }
+    inline const char & operator[](size_t idx)const{
+        assert(idx<= strlen(buffer));
+        return buffer[idx];
+    }
+    inline size_t size() const{
+        return strlen(buffer);
+    }
+    inline void push(char c){
+        size_t s = this->size();
+        assert(s<SIZE-1);
+        buffer[s] = c;
+    }
+    inline void pop(){
+        size_t s = this->size();
+        this->buffer[s+1] =0;
+    }
+    inline BufferStr<SIZE> operator+(const BufferStr<SIZE> & rhs)const{
+        BufferStr<SIZE> out;
+        size_t l = this->size();
+        size_t l2 = rhs.size();
+        assert(l+l2 <SIZE-1);
+        for(size_t i =0; i<l; i++){
+            out.buffer[i] = this->buffer[i];
+        }
+        for(size_t i = 0; i<l2; i++){
+            out.buffer[i+l] = rhs.buffer[i];
+        }
+        return out;
+    }
+    inline BufferStr<SIZE> operator+(const char * rhs)const{
+        BufferStr<SIZE> out;
+        size_t l = this->size();
+        size_t l2 = strlen(rhs);
+        assert(l+l2 <SIZE-1);
+        for(size_t i =0; i<l; i++){
+            out.buffer[i] = this->buffer[i];
+        }
+        for(size_t i = 0; i<l2; i++){
+            out.buffer[i+l] = rhs[i];
+        }
+        return out;
+    }
+    inline BufferStr<SIZE> operator+=(const BufferStr<SIZE>&rhs){
+        *this = *this+rhs;
+        return *this;
+    }
+    inline BufferStr<SIZE> operator+=(const char * rhs){
+        *this = *this+rhs;
+        return *this;
+    }
+    inline char* begin(){
+        return this->buffer; 
+    }
+    inline char* end(){
+        size_t size = this->size();
+        return this->buffer+size;
+    }
+    inline const char* begin()const {
+        return this->buffer; 
+    }
+    inline const char* end()const {
+        size_t size = this->size();
+        return this->buffer+size;
+    }
+    inline char* c_str(){
+        return this->buffer;
+    }
+    inline const char* c_str() const{
+        return this->buffer;
+    }
+    inline size_t buffer_size()const{
+        return SIZE;
+    }
+    static inline BufferStr<SIZE> format(const char * fmt, ...){
+        va_list vargs;
+        va_start(vargs, fmt);
+        BufferStr<SIZE> out;
+        int32_t count = vsnprintf(out.buffer, SIZE-1, fmt, vargs);
+        va_end(vargs);
+        assert(count<SIZE-1);
+        return out;
+    }
+    inline char* operator*(){
+        return this->buffer;
+    }
+    inline const char* operator*()const{
+        return this->buffer;
+    }
+    inline BufferStr(char x){
+        snprintf(buffer, SIZE-1, "%c", x);
+    }
+    inline BufferStr(int8_t x){
+        snprintf(buffer, SIZE-1, "%d", (int32_t)x);
+    }
+    inline BufferStr(uint8_t x){
+        snprintf(buffer, SIZE-1, "%u", (uint32_t)x);
+    }
+    inline BufferStr(int16_t x){
+        snprintf(buffer, SIZE-1, "%d", (int32_t)x);
+    }
+    inline BufferStr(uint16_t x){
+        snprintf(buffer, SIZE-1, "%u", (uint32_t)x);
+    }
+    inline BufferStr(int32_t x){
+        snprintf(buffer, SIZE-1, "%d", x);
+    }
+    inline BufferStr(uint32_t x){
+        snprintf(buffer, SIZE-1, "%u", x);
+    }
+    inline BufferStr(int64_t x){
+        snprintf(buffer, SIZE-1, "%lld", x);
+    }
+    inline BufferStr(uint64_t x){
+        snprintf(buffer, SIZE-1, "%llu", x);
+    }
+    inline BufferStr(size_t x){
+        snprintf(buffer, SIZE-1, "%zu", x);
+    }
 
+    inline BufferStr(float x){
+        snprintf(buffer, SIZE-1, "%f", x);
+    }
+    inline BufferStr(double x){
+        snprintf(buffer, SIZE-1, "%lf", x);
+    }
+};
+
+using SmolStr = BufferStr<32>;
+using BStr = BufferStr<256>;
+using LStr = BufferStr<2048>;
