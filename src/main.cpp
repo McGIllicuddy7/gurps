@@ -1,12 +1,31 @@
 #include "utils.hpp"
+#include "engine.hpp"
+struct Test{
+	string name;
+	int32_t x;
+	int32_t y;
+	int32_t health;
+};
+
+G_MAKE_SERIALIZEABLE(Test, G_FIELD(name), G_FIELD(x), G_FIELD(y), G_FIELD(health));
 
 int main(){
-	Arena arena;
-	Slice<string> v = arena.create_slice<string>(100);
-	for(i32 i =0; i<v.size(); i++){
-		v[i]= fmt_string(&arena, "henlo:%d", i);
+	bool serialize = false;
+	if (serialize){
+		BiteStream bites;
+		Test test;
+		test.name = "bridget :3";
+		test.x = 420;
+		test.y = 69;
+		test.health = 67;
+		bites.serialize(test);
+		bites.write_to_file("test.txt");
+	}else{
+		BiteStream bites = BiteStream::read_from_file("test.txt");
+		Test test;
+		assert(bites.deserialize(test));
+		printf("Test{name:%s, x:%d, y:%d, health:%d}\n", test.name.c_str(), test.x, test.y, test.health);
 	}
-	for(const auto &i: v){
-		printf("%s\n", i.c_str());
-	}
-}
+}	
+
+void game_runtime_setup(){}

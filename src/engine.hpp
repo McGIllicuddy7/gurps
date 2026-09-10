@@ -40,27 +40,41 @@ struct EntityClass{
     void (*serialize)(Entity* et, BiteStream &stream);
 };
 
+struct Spawn{
+    string spawned_class;
+    Vector2 position;
+};
+
 struct Wall{
     Vector2 start;
-    Vector2 end; 
+    Vector2 end;   
+    int32_t height; 
 };
 
 struct WorldData{
     vector<Wall> walls;
-    vector<string> spawns;
+    vector<Spawn> spawns;
 };
 
 struct EntityBox{
-    unique_ptr<Entity> entity;
-    uint16_t generation;
+    unique_ptr<Entity> entity = unique_ptr<Entity>(nullptr);
+    uint16_t generation =0;
 };
 
 struct World{
-    vector<Wall> walls;
     array<EntityBox, MAX_ENTITY_COUNT> entities;
 };
-struct Engine{
 
+enum GameState{
+    GAME_STATE_PAUSED, 
+    GAME_STATE_MENU, 
+    GAME_STATE_PLAYING,
+};
+
+struct Engine{ 
+    World world;
+    GameState game_state;
+    vector<EntityClass> class_registery;
 };
 
 World* get_world();
@@ -72,3 +86,12 @@ struct Collision{
     Vector2 position;
     Vector2 normal;
 };
+
+
+void game_iteration_paused();
+void game_iteration_menu();
+void game_iteration_playing();
+void game_loop();
+void game_engine_init();
+extern void game_runtime_setup();
+void game_load();

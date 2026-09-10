@@ -497,5 +497,36 @@ class Arena{
         T* out = (T*)this->alloc(sizeof(T)*count);
         return Slice<T>(out, count);
     }
+    void reset();
 };
+
 char * fmt_string(Arena * arena, const char * fmt, ...);
+extern Arena tmp_arena;
+
+
+template<typename...T> void frd_serialize_fields(BiteStream & stream, const T&...fields){
+    ((void)stream.serialize(fields),...);
+}
+
+
+template<typename Ty> void frd_fuckery(BiteStream & stream, bool& outparam, Ty& field){
+    if(!stream.deserialize(field)){
+        outparam = false;
+    }
+};
+template<typename...T> bool frd_deserialize_fields(BiteStream & stream, T&...fields){
+    bool out = true;
+    ((void)frd_fuckery(stream, out, fields), ...);
+    return out;
+}
+
+#define G_FIELD(field) (k_struct.field)
+#define G_MAKE_SERIALIZEABLE(Type,ARGS...) \
+template<> inline void frd_serialize(BiteStream& stream, const Type& k_struct){\
+    frd_serialize_fields(stream, ARGS);\
+}\
+template<> [[nodiscard]]inline bool frd_deserialize(BiteStream& stream, Type& k_struct){\
+    return frd_deserialize_fields(stream, ARGS);\
+}\
+
+
