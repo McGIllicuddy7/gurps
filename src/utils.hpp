@@ -14,6 +14,9 @@ using std::string;
 using std::function;
 using std::unique_ptr;
 using std::make_unique;
+class ErrorCode{
+    int32_t code;
+};
 
 template<typename T> class Slice{
     T* m_ptr = 0;
@@ -685,3 +688,4 @@ template<size_t SIZE>struct BufferStr{
 using SmolStr = BufferStr<32>;
 using BStr = BufferStr<256>;
 using LStr = BufferStr<2048>;
+using HStr = BufferStr<16384>;
