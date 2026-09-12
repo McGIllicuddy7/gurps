@@ -748,5 +748,3 @@ template<> inline void frd_serialize(BiteStream& stream, const Type& k_struct){\
 template<> [[nodiscard]]inline bool frd_deserialize(BiteStream& stream, Type& k_struct){\
     return frd_deserialize_fields(stream, ARGS);\
 }\
-
-
