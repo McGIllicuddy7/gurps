@@ -3,11 +3,10 @@ package main
 import "base:runtime"
 import "core:strings"
 import "vendor:raylib"
-rl :: raylib
-Vector3 :: rl.Vector3
-Vector2 :: rl.Vector2
-Quaternion :: rl.Quaternion
-Transform :: rl.Transform
+Vector3 :: raylib.Vector3
+Vector2 :: raylib.Vector2
+Quaternion :: raylib.Quaternion
+Transform :: raylib.Transform
 MAX_ENTITY_COUNT :: 16384
 EntityKind :: enum {}
 
@@ -30,7 +29,7 @@ WorldObject :: struct {
 World :: struct {
 	entities:             [MAX_ENTITY_COUNT]Entity,
 	static_world_objects: [dynamic]WorldObject,
-	loaded_meshes:        map[string]rl.Model,
+	loaded_meshes:        map[string]raylib.Model,
 	level_arena:          runtime.Arena,
 	frame_arena:          runtime.Arena,
 }
