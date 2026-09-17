@@ -851,7 +851,7 @@ gui_begin_scrollbox :: proc(ctx: ^GuiContext, height: i32, idx := 0, loc := #cal
 
 		if rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj)) {
 			tmp := ctx.scroll_box_data[id]
-			tmp.scroll_offset_px -= cast(i32)rl.GetMouseWheelMoveV().y
+			tmp.scroll_offset_px += cast(i32)(rl.GetMouseWheelMoveV().y*100)
 			if tmp.scroll_offset_px > 0 {
 				tmp.scroll_offset_px = 0
 			}
@@ -886,7 +886,7 @@ gui_begin_scrollbox_exp :: proc(
 	if id in ctx.scroll_box_data {
 		if rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj)) {
 			tmp := ctx.scroll_box_data[id]
-			tmp.scroll_offset_px -= cast(i32)rl.GetMouseWheelMoveV().y
+			tmp.scroll_offset_px += cast(i32)(rl.GetMouseWheelMoveV().y*100)
 			if tmp.scroll_offset_px > 0 {
 				tmp.scroll_offset_px = 0
 			}

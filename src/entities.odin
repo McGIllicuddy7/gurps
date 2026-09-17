@@ -8,48 +8,33 @@ Vector2 :: raylib.Vector2
 Quaternion :: raylib.Quaternion
 Transform :: raylib.Transform
 MAX_ENTITY_COUNT :: 16384
-EntityKind :: enum {}
 
-Entity :: struct {
-	name:            string,
-	kind:            EntityKind,
-	is_player:       bool,
-	using transform: Transform,
+EntityKind::enum{}
+EntityVTable ::struct{
+	type_info: typeid,
+	typename:string,
+	on_physics_tick:proc(et:^Entity, delta_time:f32),
+	on_tick:proc(et:^Entity, delta_time:f32),
+	on_damage:proc(et:^Entity, damage_amount:f32, hit_location:string),
+	destructor:proc(et:^Entity)
 }
 
-EntitySlot :: struct {
-	ent:        Maybe(Entity),
-	generation: u32,
+EntityBoundingBox::struct{
+	width,length,height:f32, 
 }
 
-WorldObject :: struct {
-	transform: Transform,
-	mesh_name: string,
-}
-World :: struct {
-	entities:             [MAX_ENTITY_COUNT]Entity,
-	static_world_objects: [dynamic]WorldObject,
-	loaded_meshes:        map[string]raylib.Model,
-	level_arena:          runtime.Arena,
-	frame_arena:          runtime.Arena,
-}
-Runtime :: struct {
-	world: World,
+Entity ::struct {
+	vtable:^EntityVTable,
+	position:Vector3,
+	rotation:Quaternion,
+	bounding_box:EntityBoundingBox,
+	mesh:EntityMesh,
 }
 
-@(private)
-game_runtime: Runtime
-
-level_allocator :: proc() -> runtime.Allocator {
-	return runtime.arena_allocator(&game_runtime.world.level_arena)
+EntityBone::struct{
+	width,length,height:f32,	
+	offset_from_parent:Vector3,
+	children:[]EntityBone	
 }
 
-frame_allocator :: proc() -> runtime.Allocator {
-	return runtime.arena_allocator(&game_runtime.world.frame_arena)
-}
-
-general_allocator :: proc() -> runtime.Allocator {
-	return context.allocator
-}
-
-init_runtime :: proc() {}
+EntityMesh::struct{}
