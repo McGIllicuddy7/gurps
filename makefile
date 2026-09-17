@@ -1,2 +1,2 @@
 make: src
-	odin build src -out:a.out
+	odin build src -out:a.out -debug

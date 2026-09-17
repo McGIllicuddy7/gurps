@@ -271,11 +271,14 @@ GuiObject :: struct {
 	bg_color:                rl.Color,
 	state:                   GuiObjectState,
 	texture:                 ^rl.Texture2D,
+	button_texture_height:   i32,
+	button_texture_width:    i32,
 }
 
 
 GuiObjectType :: enum {
 	Button,
+	ThumbnailButton,
 	Div,
 	ScrollBox,
 	Text,
@@ -533,7 +536,11 @@ gui_destroy :: proc(ctx: ^GuiContext) {
 		delete(i)
 	}
 	delete(ctx.scroll_box_data)
-
+	for i, j in ctx.images {
+		delete(i)
+		rl.UnloadTexture(j)
+	}
+	delete(ctx.images)
 	free(ctx)
 }
 
@@ -625,7 +632,7 @@ measure_rune_width :: proc(rn: rune, size: i32) -> i32 {
 	} else if rn == '\t' {
 		return size * 3
 	} else {
-		return (size * 2) / 5
+		return (size * 3) / 5
 	}
 }
 
@@ -653,6 +660,36 @@ gui_draw_object :: proc(obj: ^GuiObject, cmds: ^GraphicsCommandBuffer) {
 			dy += obj.text_height
 		}
 		break
+	case .ThumbnailButton:
+		cmd_draw_rectangle(
+			cmds,
+			obj.x,
+			obj.y,
+			obj.width,
+			obj.height,
+			gui_trans_color(obj.bg_color, obj.state),
+		)
+		dy: i32 = 0
+		cmd_draw_texture(
+			cmds,
+			obj.texture,
+			obj.x + obj.padding,
+			obj.y + obj.padding,
+			obj.button_texture_width,
+			obj.button_texture_height,
+			gui_trans_color(rl.WHITE, obj.state),
+		)
+		for i in obj.text {
+			cmd_draw_text(
+				cmds,
+				i,
+				obj.x + obj.padding * 2 + obj.button_texture_width,
+				obj.y + dy + obj.padding,
+				obj.text_height,
+				gui_trans_color(obj.text_color, obj.state),
+			)
+			dy += obj.text_height
+		}
 	case .Div:
 		for i in obj.chidren {
 			gui_draw_object(i, cmds)
@@ -871,9 +908,9 @@ gui_begin_scrollbox_exp :: proc(
 gui_end_scrollbox :: proc(ctx: ^GuiContext) {
 	prev := ctx.current_object
 	base := ctx.scroll_box_data[prev.id]
-	base.height_px = prev.bmp_offset * 2 - prev.height + prev.padding * 2 - base.scroll_offset_px
-	if len(prev.chidren) > 0 {
-		base.height_px -= prev.chidren[len(prev.chidren) - 1].height
+	base.height_px = prev.padding * 2 - prev.height
+	for i in prev.chidren {
+		base.height_px += i.height + prev.padding
 	}
 	if base.height_px < 0 {
 		base.height_px = 0
@@ -889,12 +926,7 @@ gui_end_scrollbox :: proc(ctx: ^GuiContext) {
 gui_image :: proc(ctx: ^GuiContext, name: string, idx: i32 = 0, loc := #caller_location) {
 	id := gui_object_id(ctx, idx, loc)
 	obj := gui_new_object(ctx, GuiObjectType.Image, id)
-	if !(name in ctx.images) {
-		text := rl.LoadTexture(strings.clone_to_cstring(name, gui_allocator(ctx)))
-		tname := strings.clone(name)
-		map_insert(&ctx.images, name, text)
-	}
-	texture := &ctx.images[name]
+	texture := gui_get_texture(ctx, name)
 	obj.texture = texture
 	rat := cast(f32)texture.height / cast(f32)texture.width
 	obj.x = ctx.current_object.x + ctx.current_object.padding
@@ -903,3 +935,128 @@ gui_image :: proc(ctx: ^GuiContext, name: string, idx: i32 = 0, loc := #caller_l
 	obj.height = cast(i32)(rat * cast(f32)obj.width)
 	ctx.current_object.bmp_offset += obj.height + obj.padding
 }
+
+gui_image_exp :: proc(
+	ctx: ^GuiContext,
+	name: string,
+	dx: i32,
+	dy: i32,
+	width: i32,
+	idx: i32 = 0,
+	loc := #caller_location,
+) {
+	id := gui_object_id(ctx, idx, loc)
+	obj := gui_new_object(ctx, GuiObjectType.Image, id)
+	texture := gui_get_texture(ctx, name)
+	obj.texture = texture
+	rat := cast(f32)texture.height / cast(f32)texture.width
+	obj.x = ctx.current_object.x + ctx.current_object.padding + dx
+	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding + dy
+	obj.width = width
+	obj.height = cast(i32)(rat * cast(f32)obj.width)
+	ctx.current_object.bmp_offset += obj.height + obj.padding
+}
+
+gui_button_thumbnail :: proc(
+	ctx: ^GuiContext,
+	thumbnail: string,
+	text: string,
+	text_height: i32,
+	idx := 0,
+	loc := #caller_location,
+) -> bool {
+	id := gui_object_id(ctx, cast(i32)idx, loc)
+	obj := gui_new_object(ctx, GuiObjectType.ThumbnailButton, id)
+	obj.x = ctx.current_object.x + ctx.current_object.padding
+	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding
+	obj.width = ctx.current_object.width - ctx.current_object.padding * 2
+	texture := gui_get_texture(ctx, thumbnail)
+	obj.texture = texture
+	obj.button_texture_height = text_height
+	rat := cast(f32)texture.width / cast(f32)texture.height
+	obj.button_texture_width = cast(i32)(cast(f32)text_height * rat)
+	obj.text = split_text_lines(
+		text,
+		text_height,
+		obj.width - obj.padding * 3 - obj.button_texture_width,
+		gui_allocator(ctx),
+	)
+	obj.height =
+		text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height + obj.padding * 2
+	ctx.current_object.bmp_offset += obj.height + obj.padding
+	obj.text_height = text_height
+	x := cast(i32)rl.GetMouseX()
+	y := cast(i32)rl.GetMouseY()
+	hit := (x >= obj.x && x < obj.x + obj.width) && (y >= obj.y && y < obj.y + obj.height)
+	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj.parent)) &&
+	   obj.parent.type == GuiObjectType.ScrollBox {
+		hit = false
+	}
+	if hit {
+		if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
+			obj.state = GuiObjectState.Selected
+		} else {
+			obj.state = GuiObjectState.Hovered
+		}
+	}
+	return hit && rl.IsMouseButtonReleased(rl.MouseButton.LEFT)
+}
+
+gui_button_thumbnail_exp :: proc(
+	ctx: ^GuiContext,
+	thumbnail: string,
+	text: string,
+	text_height: i32,
+	dx: i32,
+	dy: i32,
+	width: i32,
+	idx := 0,
+	loc := #caller_location,
+) -> bool {
+	id := gui_object_id(ctx, cast(i32)idx, loc)
+	obj := gui_new_object(ctx, GuiObjectType.Button, id)
+	obj.x = ctx.current_object.x + ctx.current_object.padding + dx
+	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding + dy
+	obj.width = width
+	texture := gui_get_texture(ctx, thumbnail)
+	obj.texture = texture
+	obj.button_texture_height = text_height
+	rat := cast(f32)texture.width / cast(f32)texture.height
+	obj.button_texture_width = cast(i32)(cast(f32)text_height * rat)
+	obj.text = split_text_lines(
+		text,
+		text_height,
+		obj.width - obj.padding * 3 - obj.button_texture_width,
+		gui_allocator(ctx),
+	)
+	obj.height =
+		text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height + obj.padding * 2
+	obj.text_height = text_height
+	obj.position_set_explicitly = true
+	x := cast(i32)rl.GetMouseX()
+	y := cast(i32)rl.GetMouseY()
+	hit := (x >= obj.x && x < obj.x + obj.width) && (y >= obj.y && y < obj.y + obj.height)
+	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj.parent)) &&
+	   obj.parent.type == GuiObjectType.ScrollBox {
+		hit = false
+	}
+	if hit {
+		if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
+			obj.state = GuiObjectState.Selected
+		} else {
+			obj.state = GuiObjectState.Hovered
+		}
+	}
+	return hit && rl.IsMouseButtonReleased(rl.MouseButton.LEFT)
+}
+
+gui_get_texture :: proc(ctx: ^GuiContext, name: string) -> ^rl.Texture2D {
+	if !(name in ctx.images) {
+		text := rl.LoadTexture(strings.clone_to_cstring(name, gui_allocator(ctx)))
+		tname := strings.clone(name)
+		map_insert(&ctx.images, tname, text)
+	}
+	return &ctx.images[name]
+}
+
+LOREM_IPSUM :: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam faucibus lacus non lorem viverra porttitor. Ut eu magna non felis consequat ultrices. Sed euismod purus id viverra auctor. In hac habitasse platea dictumst. Ut odio ante, consequat sed malesuada quis, lacinia vitae purus. Aliquam pellentesque sit amet ante et auctor. Vivamus dictum mollis lacus sit amet venenatis. Nam vulputate lacus purus, et bibendum justo pharetra id.\n\nAenean posuere ut orci at faucibus. Donec sagittis felis in massa dapibus, eget convallis nulla viverra. Integer at ipsum mi. Sed aliquam accumsan pulvinar. Ut placerat dui metus, non finibus mi aliquet ullamcorper. Aenean scelerisque fringilla purus, sed imperdiet diam posuere ut. Aliquam eget quam id nisi finibus placerat. Integer rhoncus eros eget ligula cursus pharetra. Ut ac quam elementum, pretium turpis quis, porta velit. In congue ipsum sed mauris auctor, dictum dignissim elit ultrices. Proin nec augue sed eros molestie dictum ac id neque.\n\nCurabitur urna odio, dapibus sed porta eget, luctus eget magna. Quisque et dignissim nisl. Nunc auctor tortor vel sem sodales, ut euismod augue vehicula. Curabitur vitae erat vel ante mattis egestas. Ut in justo id enim molestie consequat. In metus justo, fermentum ac condimentum sit amet, lobortis aliquet neque. Duis quis nisl ut arcu eleifend efficitur a ac magna. Duis tempus lacus sit amet nisl porta condimentum. Interdum et malesuada fames ac ante ipsum primis in faucibus. Quisque eleifend dolor lacus, a tincidunt ante consequat eget. Etiam consequat auctor mauris, ut placerat velit gravida et.\n\nMorbi egestas sit amet ipsum ac pharetra. Nullam vel lectus sollicitudin, fringilla nisi non, rutrum tellus. Proin auctor tellus sit amet mi sollicitudin, vel accumsan arcu efficitur. Cras sagittis arcu vitae nisl auctor mattis. Suspendisse bibendum suscipit nisi et molestie. Quisque sed imperdiet nisi. Cras mattis massa arcu, imperdiet aliquam felis tincidunt sagittis. Aliquam diam ipsum, auctor non maximus vitae, sodales eu felis. Nunc ut purus a magna cursus lacinia ut ut velit.\n\nSuspendisse lacinia fermentum quam eu sagittis. Sed ut nunc pretium, lobortis lectus tincidunt, luctus felis. Nulla lectus justo, posuere a ante non, suscipit vulputate purus. Nam fringilla suscipit lorem. Proin et suscipit urna, id viverra lectus. Etiam a dui ultrices, semper urna a, mattis quam. Vestibulum id arcu tincidunt, tempor nisl et, suscipit odio. "
