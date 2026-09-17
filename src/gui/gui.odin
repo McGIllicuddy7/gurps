@@ -214,6 +214,12 @@ new_command_buffer :: proc() -> GraphicsCommandBuffer {
 	return out
 }
 
+GuiObjectState :: enum {
+	NotSelected,
+	Hovered,
+	Selected,
+}
+
 GuiObject :: struct {
 	type:                    GuiObjectType,
 	id:                      string,
@@ -228,6 +234,7 @@ GuiObject :: struct {
 	text_color:              rl.Color,
 	outline_color:           rl.Color,
 	bg_color:                rl.Color,
+	state:                   GuiObjectState,
 }
 
 
@@ -276,7 +283,7 @@ gui_new_object :: proc(ctx: ^GuiContext, type: GuiObjectType, name: string) -> ^
 	obj.parent = ctx.current_object
 	obj.type = type
 	obj.chidren = make([dynamic]^GuiObject, gui_allocator((ctx)))
-	obj.text_color = rl.LIGHTGRAY
+	obj.text_color = rl.WHITE
 	obj.bg_color = rl.GRAY
 	obj.outline_color = rl.BLACK
 	obj.padding = 5
@@ -368,13 +375,21 @@ gui_button :: proc(
 	obj.x = ctx.current_object.x + ctx.current_object.padding
 	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding
 	obj.width = ctx.current_object.width - ctx.current_object.padding * 2
-	obj.text = split_text_lines(text, text_height, obj.width, gui_allocator(ctx))
-	obj.height = text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height
+	obj.text = split_text_lines(text, text_height, obj.width - obj.padding * 2, gui_allocator(ctx))
+	obj.height =
+		text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height + obj.padding * 2
 	ctx.current_object.bmp_offset += obj.height + obj.padding
 	obj.text_height = text_height
 	x := cast(i32)rl.GetMouseX()
 	y := cast(i32)rl.GetMouseY()
 	hit := (x >= obj.x && x < obj.x + obj.width) && (y >= obj.y && y < obj.y + obj.height)
+	if hit {
+		if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
+			obj.state = GuiObjectState.Selected
+		} else {
+			obj.state = GuiObjectState.Hovered
+		}
+	}
 	return hit && rl.IsMouseButtonReleased(rl.MouseButton.LEFT)
 }
 
@@ -390,8 +405,9 @@ gui_text :: proc(
 	obj.x = ctx.current_object.x + ctx.current_object.padding
 	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding
 	obj.width = ctx.current_object.width - ctx.current_object.padding * 2
-	obj.text = split_text_lines(text, text_height, obj.width, gui_allocator(ctx))
-	obj.height = text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height
+	obj.text = split_text_lines(text, text_height, obj.width - obj.padding * 2, gui_allocator(ctx))
+	obj.height =
+		text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height + obj.padding * 2
 	obj.text_height = text_height
 	ctx.current_object.bmp_offset += obj.height + obj.padding
 
@@ -413,13 +429,21 @@ gui_button_exp :: proc(
 	obj.x = ctx.current_object.x + ctx.current_object.padding + dx
 	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding + dy
 	obj.width = width
-	obj.text = split_text_lines(text, text_height, obj.width, gui_allocator(ctx))
-	obj.height = text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height
+	obj.text = split_text_lines(text, text_height, obj.width - obj.padding * 2, gui_allocator(ctx))
+	obj.height =
+		text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height + obj.padding * 2
 	obj.text_height = text_height
 	obj.position_set_explicitly = true
 	x := cast(i32)rl.GetMouseX()
 	y := cast(i32)rl.GetMouseY()
 	hit := (x >= obj.x && x < obj.x + obj.width) && (y >= obj.y && y < obj.y + obj.height)
+	if hit {
+		if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
+			obj.state = GuiObjectState.Selected
+		} else {
+			obj.state = GuiObjectState.Hovered
+		}
+	}
 	return hit && rl.IsMouseButtonReleased(rl.MouseButton.LEFT)
 }
 
@@ -438,9 +462,10 @@ gui_text_exp :: proc(
 	obj.x = ctx.current_object.x + ctx.current_object.padding + dx
 	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding + dy
 	obj.width = width
-	obj.text = split_text_lines(text, text_height, obj.width, gui_allocator(ctx))
+	obj.text = split_text_lines(text, text_height, obj.width - obj.padding * 2, gui_allocator(ctx))
 	obj.text_height = text_height
-	obj.height = text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height
+	obj.height =
+		text_height if len(obj.text) == 0 else cast(i32)len(obj.text) * text_height + obj.padding * 2
 	obj.position_set_explicitly = true
 }
 
@@ -534,6 +559,7 @@ split_text_lines :: proc(
 			}
 		} else {
 			strings.write_rune(&current, i)
+			width += w
 		}
 	}
 	tmp := strings.to_string(current)
@@ -550,17 +576,31 @@ measure_rune_width :: proc(rn: rune, size: i32) -> i32 {
 	} else if rn == '\t' {
 		return size * 3
 	} else {
-		return (size * 3) / 2
+		return (size * 2) / 5
 	}
 }
 
 gui_draw_object :: proc(obj: ^GuiObject, cmds: ^GraphicsCommandBuffer) {
 	switch obj.type {
 	case .Button:
-		cmd_draw_rectangle(cmds, obj.x, obj.y, obj.width, obj.height, obj.bg_color)
+		cmd_draw_rectangle(
+			cmds,
+			obj.x,
+			obj.y,
+			obj.width,
+			obj.height,
+			gui_trans_color(obj.bg_color, obj.state),
+		)
 		dy: i32 = 0
 		for i in obj.text {
-			cmd_draw_text(cmds, i, obj.x, obj.y + dy, obj.text_height, obj.text_color)
+			cmd_draw_text(
+				cmds,
+				i,
+				obj.x + obj.padding,
+				obj.y + dy + obj.padding,
+				obj.text_height,
+				gui_trans_color(obj.text_color, obj.state),
+			)
 			dy += obj.text_height
 		}
 		break
@@ -571,8 +611,12 @@ gui_draw_object :: proc(obj: ^GuiObject, cmds: ^GraphicsCommandBuffer) {
 		break
 	case .ScrollBox:
 		cmd_begin_scissor(cmds, obj.x, obj.y, obj.width, obj.height)
+		bds := gui_object_bounds(obj)
 		for i in obj.chidren {
-			gui_draw_object(i, cmds)
+			tmp := gui_object_bounds(i)
+			if rl.CheckCollisionRecs(bds, tmp) {
+				gui_draw_object(i, cmds)
+			}
 		}
 		cmd_end_scissor(cmds)
 		break
@@ -580,12 +624,131 @@ gui_draw_object :: proc(obj: ^GuiObject, cmds: ^GraphicsCommandBuffer) {
 		assert(false, "todo images")
 		break
 	case .Text:
-		cmd_draw_rectangle(cmds, obj.x, obj.y, obj.width, obj.height, obj.bg_color)
+		cmd_draw_rectangle(
+			cmds,
+			obj.x,
+			obj.y,
+			obj.width,
+			obj.height,
+			gui_trans_color(obj.bg_color, obj.state),
+		)
 		dy: i32 = 0
 		for i in obj.text {
-			cmd_draw_text(cmds, i, obj.x, obj.y + dy, obj.text_height, obj.text_color)
+			cmd_draw_text(
+				cmds,
+				i,
+				obj.x + obj.padding,
+				obj.y + dy + obj.padding,
+				obj.text_height,
+				gui_trans_color(obj.text_color, obj.state),
+			)
 			dy += obj.text_height
 		}
 		break
 	}
+}
+
+
+gui_object_bounds :: proc(obj: ^GuiObject) -> rl.Rectangle {
+	return rl.Rectangle{cast(f32)obj.x, cast(f32)obj.y, cast(f32)obj.width, cast(f32)obj.height}
+}
+
+gui_trans_color :: proc(color: rl.Color, state: GuiObjectState) -> rl.Color {
+	t_out := cast([4]f32)color
+	base_a := t_out.a
+	switch state {
+	case .NotSelected:
+		t_out = t_out * 1.
+		break
+	case .Hovered:
+		t_out = t_out * 0.9
+		break
+	case .Selected:
+		t_out = t_out * 0.8
+		break
+	}
+	t_out.a = base_a
+	return cast(rl.Color)cast([4]u8)t_out
+}
+
+gui_centered :: proc(object_dim: i32, within_dim: i32 = -1) -> i32 {
+	within_dim := within_dim
+	if (within_dim == -1) {
+		within_dim = rl.GetScreenWidth()
+	}
+	return (within_dim - object_dim) / 2
+}
+
+gui_centered_v :: proc(object_dim: i32, within_dim: i32 = -1) -> i32 {
+	within_dim := within_dim
+	if (within_dim == -1) {
+		within_dim = rl.GetScreenHeight()
+	}
+	return (within_dim - object_dim) / 2
+}
+
+trans :: proc(v: i32) -> i32 {
+	rat := (cast(f32)rl.GetScreenWidth() / 1920)
+	out := cast(f32)v * rat
+	return cast(i32)out
+}
+
+trans_v :: proc(v: i32) -> i32 {
+	rat := (cast(f32)rl.GetScreenHeight() / 1080)
+	out := cast(f32)v * rat
+	return cast(i32)out
+}
+
+gui_centered_trans :: proc(object_dim: i32, within_dim: i32 = -1) -> i32 {
+	within_dim := within_dim
+	if (within_dim == -1) {
+		within_dim = rl.GetScreenWidth()
+	} else {
+		within_dim = trans(within_dim)
+	}
+	return (within_dim - trans(object_dim)) / 2
+}
+
+gui_centered_v_trans :: proc(object_dim: i32, within_dim: i32 = -1) -> i32 {
+	within_dim := within_dim
+	if (within_dim == -1) {
+		within_dim = rl.GetScreenHeight()
+	} else {
+		within_dim = trans(within_dim)
+	}
+	return (within_dim - trans(object_dim)) / 2
+}
+
+gui_begin_root_centered :: proc(
+	ctx: ^GuiContext,
+	width: i32,
+	height: i32,
+	idx := 0,
+	loc := #caller_location,
+) {
+	gui_begin_root(ctx, gui_centered(width), gui_centered_v(height), width, height, idx, loc)
+}
+
+gui_end_root_centered :: proc(ctx: ^GuiContext) {
+	gui_end_root(ctx)
+}
+
+gui_shift_for_exp :: proc(ctx: ^GuiContext) {
+	cur := ctx.current_object
+	assert(cur != nil)
+	assert(len(cur.chidren) > 0)
+	last := cur.chidren[len(cur.chidren) - 1]
+	dy := last.y - cur.y + last.height
+	if dy >= cur.bmp_offset {
+		cur.bmp_offset = dy
+	}
+}
+
+gui_next_pos_for_exp :: proc(ctx: ^GuiContext) -> i32 {
+	cur := ctx.current_object
+	assert(cur != nil)
+	assert(len(cur.chidren) > 0)
+	last := cur.chidren[len(cur.chidren) - 1]
+	dx := last.x - cur.x + last.width
+	return dx
 }

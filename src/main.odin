@@ -11,38 +11,64 @@ _ :: fmt
 _ :: gui
 _ :: 0
 main :: proc() {
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	defer mem.tracking_allocator_destroy(&track)
-	context.allocator = mem.tracking_allocator(&track)
-	{
-		rl.InitWindow(1000, 1000, "hello window!")
-		defer rl.CloseWindow()
-		ctx := gui.gui_create()
-		defer gui.gui_destroy(ctx)
-		for !rl.WindowShouldClose() {
-			gui.gui_begin_frame(ctx)
+	debug_main(dbg_main)
+}
+dbg_main :: proc() {
+	rl.InitWindow(1000, 1000, "hello window!")
+	defer rl.CloseWindow()
+	ctx := gui.gui_create()
+	defer gui.gui_destroy(ctx)
+	count := 0
+	for !rl.WindowShouldClose() {
+		gui.gui_begin_frame(ctx)
+		{
+			gui.gui_begin_root_centered(ctx, 500, 500)
 			{
-				gui.gui_begin_root(ctx, 100, 100, 300, 500)
-				{
-					gui.gui_begin_div(ctx)
-					gui.gui_text(ctx, "hello world!", 20)
-					if gui.gui_button(ctx, "click to exit", 40) {
-						break
-					}
-					gui.gui_end_div(ctx)
+				gui.gui_begin_div(ctx)
+				gui.gui_text(ctx, "hello world!", 20)
+				if gui.gui_button(ctx, "click to exit", 40) {
+					break
 				}
-				gui.gui_end_root(ctx)
+				for i in 0 ..< count {
+					gui.gui_text(ctx, fmt.tprint(i), 20)
+				}
+				if gui.gui_button_exp(ctx, "inc count", 20, 0, 0, 140) {
+					count += 1
+				}
+				if gui.gui_button_exp(
+					ctx,
+					"dec count",
+					20,
+					gui.gui_next_pos_for_exp(ctx),
+					0,
+					140,
+				) {
+					count -= 1
+					if count < 0 {
+						count = 0
+					}
+				}
+				if gui.gui_button_exp(
+					ctx,
+					"count reset",
+					20,
+					gui.gui_next_pos_for_exp(ctx),
+					0,
+					160,
+				) {
+					count = 0
+				}
+				gui.gui_shift_for_exp(ctx)
+				gui.gui_text(ctx, "end", 20)
+				gui.gui_end_div(ctx)
 			}
-			gui.gui_end_frame(ctx)
-			rl.BeginDrawing()
-			rl.ClearBackground(rl.BLACK)
-			gui.gui_render(ctx)
-			rl.EndDrawing()
+			gui.gui_end_root_centered(ctx)
 		}
+		gui.gui_end_frame(ctx)
+		rl.BeginDrawing()
+		rl.ClearBackground(rl.BLACK)
+		gui.gui_render(ctx)
+		rl.EndDrawing()
+	}
 
-	}
-	for _, leak in track.allocation_map {
-		fmt.printf("%v leaked %m\n", leak.location, leak.size)
-	}
 }
