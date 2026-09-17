@@ -22,14 +22,14 @@ dbg_main :: proc() {
 	for !rl.WindowShouldClose() {
 		gui.gui_begin_frame(ctx)
 		{
-			gui.gui_begin_root_centered(ctx, 500, 500)
+			gui.gui_begin_root_centered(ctx, 500, 1000)
 			{
 				gui.gui_begin_div(ctx)
 				gui.gui_text(ctx, "hello world!", 20)
 				if gui.gui_button(ctx, "click to exit", 40) {
 					break
 				}
-				gui.gui_begin_scrollbox(ctx, 100)
+				gui.gui_begin_scrollbox(ctx, 200)
 				tcount := count
 				for i in 0 ..< tcount {
 					if gui.gui_button(ctx, fmt.tprint(i), 20) {
@@ -37,6 +37,7 @@ dbg_main :: proc() {
 					}
 				}
 				gui.gui_end_scrollbox(ctx)
+				gui.gui_image(ctx, "explosion.png")
 				if gui.gui_button_exp(ctx, "inc count", 20, 0, 0, 140) {
 					count += 1
 				}

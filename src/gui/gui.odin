@@ -1,6 +1,7 @@
 package gui
 
 import "base:runtime"
+import "base:sanitizer"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
@@ -11,6 +12,7 @@ PixelCmd :: struct {
 	x, y:  i32,
 	color: rl.Color,
 }
+
 @(private)
 CmdDrawRectangle :: struct {
 	x, y, width, height: i32,
@@ -68,6 +70,13 @@ CmdDrawPixel :: struct {
 CmdEndScissor :: struct {}
 
 @(private)
+CmdDrawTexture :: struct {
+	x, y, width, height: i32,
+	tint:                rl.Color,
+	texture:             ^rl.Texture2D,
+}
+
+@(private)
 GraphicsCommand :: union {
 	CmdDrawRectangle,
 	CmdDrawCircle,
@@ -75,6 +84,7 @@ GraphicsCommand :: union {
 	CmdDrawText,
 	CmdDrawTriangle,
 	CmdDrawTriangleV,
+	CmdDrawTexture,
 	CmdBeginScissor,
 	CmdEndScissor,
 	CmdDrawPixels,
@@ -122,6 +132,7 @@ cmd_draw_triangle_v :: proc(
 	append_elem(&buffer.commands, cmd)
 }
 
+
 cmd_draw_text :: proc(
 	buffer: ^GraphicsCommandBuffer,
 	text: string,
@@ -151,6 +162,19 @@ cmd_draw_pixel :: proc(buffer: ^GraphicsCommandBuffer, x, y: i32, color: rl.Colo
 cmd_draw_pixels :: proc(buffer: ^GraphicsCommandBuffer, pixels: []PixelCmd) {
 	cmds := make_slice([]PixelCmd, len(pixels), mem.dynamic_arena_allocator(&buffer.allocator))
 	cmd := CmdDrawPixels{cmds}
+	append_elem(&buffer.commands, cmd)
+}
+
+cmd_draw_texture :: proc(
+	buffer: ^GraphicsCommandBuffer,
+	texture: ^rl.Texture2D,
+	x: i32,
+	y: i32,
+	width: i32,
+	height: i32,
+	color: rl.Color,
+) {
+	cmd := CmdDrawTexture{x, y, width, height, color, texture}
 	append_elem(&buffer.commands, cmd)
 }
 
@@ -194,7 +218,18 @@ exec_command_buffer :: proc(buffer: ^GraphicsCommandBuffer) {
 		case CmdDrawPixel:
 			rl.DrawPixel(v.x, v.y, v.color)
 			break
+		case CmdDrawTexture:
+			rl.DrawTexturePro(
+				v.texture^,
+				rl.Rectangle{0., 0., cast(f32)v.texture.width, cast(f32)v.texture.height},
+				rl.Rectangle{cast(f32)v.x, cast(f32)v.y, cast(f32)v.width, cast(f32)v.height},
+				{0.0, 0.0},
+				0.0,
+				v.tint,
+			)
+			break
 		}
+
 	}
 }
 
@@ -235,6 +270,7 @@ GuiObject :: struct {
 	outline_color:           rl.Color,
 	bg_color:                rl.Color,
 	state:                   GuiObjectState,
+	texture:                 ^rl.Texture2D,
 }
 
 
@@ -258,6 +294,7 @@ GuiContext :: struct {
 	x, y, width, height: i32,
 	current_object:      ^GuiObject,
 	object_stack:        [dynamic]^GuiObject,
+	images:              map[string]rl.Texture2D,
 }
 
 gui_allocator :: proc(ctx: ^GuiContext) -> runtime.Allocator {
@@ -492,7 +529,11 @@ gui_destroy :: proc(ctx: ^GuiContext) {
 	free(ctx.arena)
 	delete(ctx.object_stack)
 	delete(ctx.roots)
+	for i, j in ctx.scroll_box_data {
+		delete(i)
+	}
 	delete(ctx.scroll_box_data)
+
 	free(ctx)
 }
 
@@ -629,7 +670,7 @@ gui_draw_object :: proc(obj: ^GuiObject, cmds: ^GraphicsCommandBuffer) {
 		cmd_end_scissor(cmds)
 		break
 	case .Image:
-		assert(false, "todo images")
+		cmd_draw_texture(cmds, obj.texture, obj.x, obj.y, obj.width, obj.height, obj.bg_color)
 		break
 	case .Text:
 		cmd_draw_rectangle(
@@ -843,4 +884,22 @@ gui_end_scrollbox :: proc(ctx: ^GuiContext) {
 	if !prev.position_set_explicitly {
 		ctx.current_object.bmp_offset += prev.height + prev.padding * 2
 	}
+}
+
+gui_image :: proc(ctx: ^GuiContext, name: string, idx: i32 = 0, loc := #caller_location) {
+	id := gui_object_id(ctx, idx, loc)
+	obj := gui_new_object(ctx, GuiObjectType.Image, id)
+	if !(name in ctx.images) {
+		text := rl.LoadTexture(strings.clone_to_cstring(name, gui_allocator(ctx)))
+		tname := strings.clone(name)
+		map_insert(&ctx.images, name, text)
+	}
+	texture := &ctx.images[name]
+	obj.texture = texture
+	rat := cast(f32)texture.height / cast(f32)texture.width
+	obj.x = ctx.current_object.x + ctx.current_object.padding
+	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding
+	obj.width = ctx.current_object.width - ctx.current_object.padding * 2
+	obj.height = cast(i32)(rat * cast(f32)obj.width)
+	ctx.current_object.bmp_offset += obj.height + obj.padding
 }
