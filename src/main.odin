@@ -29,9 +29,14 @@ dbg_main :: proc() {
 				if gui.gui_button(ctx, "click to exit", 40) {
 					break
 				}
-				for i in 0 ..< count {
-					gui.gui_text(ctx, fmt.tprint(i), 20)
+				gui.gui_begin_scrollbox(ctx, 100)
+				tcount := count
+				for i in 0 ..< tcount {
+					if gui.gui_button(ctx, fmt.tprint(i), 20) {
+						count = i
+					}
 				}
+				gui.gui_end_scrollbox(ctx)
 				if gui.gui_button_exp(ctx, "inc count", 20, 0, 0, 140) {
 					count += 1
 				}
@@ -58,6 +63,7 @@ dbg_main :: proc() {
 				) {
 					count = 0
 				}
+				gui.gui_text_exp(ctx, fmt.tprint(count), 20, gui.gui_next_pos_for_exp(ctx), 0, 20)
 				gui.gui_shift_for_exp(ctx)
 				gui.gui_text(ctx, "end", 20)
 				gui.gui_end_div(ctx)
@@ -70,5 +76,4 @@ dbg_main :: proc() {
 		gui.gui_render(ctx)
 		rl.EndDrawing()
 	}
-
 }

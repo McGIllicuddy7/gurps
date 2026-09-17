@@ -383,6 +383,10 @@ gui_button :: proc(
 	x := cast(i32)rl.GetMouseX()
 	y := cast(i32)rl.GetMouseY()
 	hit := (x >= obj.x && x < obj.x + obj.width) && (y >= obj.y && y < obj.y + obj.height)
+	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj.parent)) &&
+	   obj.parent.type == GuiObjectType.ScrollBox {
+		hit = false
+	}
 	if hit {
 		if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
 			obj.state = GuiObjectState.Selected
@@ -437,6 +441,10 @@ gui_button_exp :: proc(
 	x := cast(i32)rl.GetMouseX()
 	y := cast(i32)rl.GetMouseY()
 	hit := (x >= obj.x && x < obj.x + obj.width) && (y >= obj.y && y < obj.y + obj.height)
+	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj.parent)) &&
+	   obj.parent.type == GuiObjectType.ScrollBox {
+		hit = false
+	}
 	if hit {
 		if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
 			obj.state = GuiObjectState.Selected
@@ -751,4 +759,88 @@ gui_next_pos_for_exp :: proc(ctx: ^GuiContext) -> i32 {
 	last := cur.chidren[len(cur.chidren) - 1]
 	dx := last.x - cur.x + last.width
 	return dx
+}
+
+
+gui_begin_scrollbox :: proc(ctx: ^GuiContext, height: i32, idx := 0, loc := #caller_location) {
+	id := gui_object_id(ctx, cast(i32)idx, loc)
+	obj := gui_new_object(ctx, GuiObjectType.ScrollBox, id)
+	obj.x = ctx.current_object.x + ctx.current_object.padding
+	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding
+	obj.width = ctx.current_object.width - ctx.current_object.padding * 2
+	obj.height = height
+	if id in ctx.scroll_box_data {
+
+		if rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj)) {
+			tmp := ctx.scroll_box_data[id]
+			tmp.scroll_offset_px -= cast(i32)rl.GetMouseWheelMoveV().y
+			if tmp.scroll_offset_px > 0 {
+				tmp.scroll_offset_px = 0
+			}
+			if tmp.scroll_offset_px < -tmp.height_px {
+				tmp.scroll_offset_px = -tmp.height_px
+			}
+			ctx.scroll_box_data[id] = tmp
+		}
+		obj.bmp_offset = ctx.scroll_box_data[id].scroll_offset_px
+	} else {
+		map_insert(&ctx.scroll_box_data, strings.clone(id), GuiScrollBoxData{})
+	}
+	append(&ctx.object_stack, ctx.current_object)
+	ctx.current_object = obj
+}
+
+gui_begin_scrollbox_exp :: proc(
+	ctx: ^GuiContext,
+	dx: i32,
+	dy: i32,
+	width: i32,
+	height: i32,
+	idx := 0,
+	loc := #caller_location,
+) {
+	id := gui_object_id(ctx, cast(i32)idx, loc)
+	obj := gui_new_object(ctx, GuiObjectType.ScrollBox, id)
+	obj.x = ctx.current_object.x + ctx.current_object.padding + dx
+	obj.y = ctx.current_object.y + ctx.current_object.bmp_offset + ctx.current_object.padding + dy
+	obj.width = width
+	obj.height = height
+	if id in ctx.scroll_box_data {
+		if rl.CheckCollisionPointRec(rl.GetMousePosition(), gui_object_bounds(obj)) {
+			tmp := ctx.scroll_box_data[id]
+			tmp.scroll_offset_px -= cast(i32)rl.GetMouseWheelMoveV().y
+			if tmp.scroll_offset_px > 0 {
+				tmp.scroll_offset_px = 0
+			}
+			if tmp.scroll_offset_px < -tmp.height_px {
+				tmp.scroll_offset_px = -tmp.height_px
+			}
+			ctx.scroll_box_data[id] = tmp
+		}
+		obj.bmp_offset = ctx.scroll_box_data[id].scroll_offset_px
+	} else {
+		map_insert(&ctx.scroll_box_data, strings.clone(id), GuiScrollBoxData{})
+	}
+	obj.position_set_explicitly = true
+	append(&ctx.object_stack, ctx.current_object)
+	ctx.current_object = obj
+
+}
+
+gui_end_scrollbox :: proc(ctx: ^GuiContext) {
+	prev := ctx.current_object
+	base := ctx.scroll_box_data[prev.id]
+	base.height_px = prev.bmp_offset * 2 - prev.height + prev.padding * 2 - base.scroll_offset_px
+	if len(prev.chidren) > 0 {
+		base.height_px -= prev.chidren[len(prev.chidren) - 1].height
+	}
+	if base.height_px < 0 {
+		base.height_px = 0
+	}
+	ctx.scroll_box_data[prev.id] = base
+	ctx.current_object = pop(&ctx.object_stack)
+	assert(ctx.current_object != nil)
+	if !prev.position_set_explicitly {
+		ctx.current_object.bmp_offset += prev.height + prev.padding * 2
+	}
 }
